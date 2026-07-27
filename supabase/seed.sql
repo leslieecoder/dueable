@@ -1,0 +1,1 @@
+-- Seed data intentionally omitted for scaffold-only setup.

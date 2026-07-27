@@ -1,0 +1,181 @@
+interface CanvasApiResponse {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  bodyText: string;
+  linkHeader: string | null;
+}
+
+export interface CanvasEnrollment {
+  enrollment_state?: string;
+  type?: string;
+  role?: string;
+}
+
+export interface CanvasCourse {
+  id: number;
+  name: string;
+  course_code?: string;
+  workflow_state?: string;
+  start_at?: string;
+  end_at?: string;
+  access_restricted_by_date?: boolean;
+  enrollments?: CanvasEnrollment[];
+}
+
+export function getCanvasBaseUrl(tabUrl: string) {
+  let parsed: URL;
+
+  try {
+    parsed = new URL(tabUrl);
+  } catch {
+    throw new Error("The active tab is not a valid Canvas URL.");
+  }
+
+  if (!parsed.hostname.includes("canvas") && !parsed.hostname.endsWith(".instructure.com")) {
+    throw new Error("Open a Canvas page before syncing classes.");
+  }
+
+  return parsed.origin;
+}
+
+function isCanvasCourse(value: unknown): value is CanvasCourse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return typeof candidate.id === "number" && typeof candidate.name === "string";
+}
+
+function normalizeEnrollments(value: unknown): CanvasEnrollment[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const enrollments = value
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object")
+    .map((entry) => ({
+      enrollment_state: typeof entry.enrollment_state === "string" ? entry.enrollment_state : undefined,
+      type: typeof entry.type === "string" ? entry.type : undefined,
+      role: typeof entry.role === "string" ? entry.role : undefined,
+    }));
+
+  return enrollments.length > 0 ? enrollments : undefined;
+}
+
+function normalizeCourse(candidate: Record<string, unknown>): CanvasCourse {
+
+  return {
+    id: candidate.id as number,
+    name: candidate.name as string,
+    course_code: typeof candidate.course_code === "string" ? candidate.course_code : undefined,
+    workflow_state: typeof candidate.workflow_state === "string" ? candidate.workflow_state : undefined,
+    start_at: typeof candidate.start_at === "string" ? candidate.start_at : undefined,
+    end_at: typeof candidate.end_at === "string" ? candidate.end_at : undefined,
+    access_restricted_by_date:
+      typeof candidate.access_restricted_by_date === "boolean" ? candidate.access_restricted_by_date : undefined,
+    enrollments: normalizeEnrollments(candidate.enrollments),
+  };
+}
+
+async function runCanvasRequestInTab(tabId: number, url: string): Promise<CanvasApiResponse> {
+  let results: chrome.scripting.InjectionResult<CanvasApiResponse | { networkError: string }>[];
+
+  try {
+    results = await chrome.scripting.executeScript({
+      target: { tabId },
+      world: "MAIN",
+      args: [url],
+      func: async (requestUrl: string) => {
+        try {
+          const response = await fetch(requestUrl, {
+            credentials: "include",
+            headers: {
+              Accept: "application/json",
+            },
+          });
+
+          return {
+            ok: response.ok,
+            status: response.status,
+            statusText: response.statusText,
+            bodyText: await response.text(),
+            linkHeader: response.headers.get("link"),
+          };
+        } catch (error) {
+          return {
+            networkError: error instanceof Error ? error.message : "Unable to reach the Canvas API.",
+          };
+        }
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      error instanceof Error
+        ? `Unable to run the Canvas request in the active tab: ${error.message}`
+        : "Unable to run the Canvas request in the active tab.",
+    );
+  }
+
+  const payload = results[0]?.result;
+
+  if (!payload) {
+    throw new Error("Canvas did not return a response from the active tab.");
+  }
+
+  if ("networkError" in payload) {
+    throw new Error(`Unable to reach the Canvas API: ${payload.networkError}`);
+  }
+
+  return payload;
+}
+
+export async function requestCanvasApi(tabId: number, url: string, errorPrefix: string): Promise<{ bodyText: string; linkHeader: string | null }> {
+  const response = await runCanvasRequestInTab(tabId, url);
+
+  if (!response.ok) {
+    const bodySummary = response.bodyText.trim();
+    throw new Error(
+      bodySummary
+        ? `${errorPrefix} failed with ${response.status} ${response.statusText}: ${bodySummary}`
+        : `${errorPrefix} failed with ${response.status} ${response.statusText}.`,
+    );
+  }
+
+  return {
+    bodyText: response.bodyText,
+    linkHeader: response.linkHeader,
+  };
+}
+
+export async function getCanvasCourses(tabId: number, canvasBaseUrl: string): Promise<CanvasCourse[]> {
+  console.log("[Dueable][Canvas API] Starting course request.");
+
+  const { bodyText } = await requestCanvasApi(tabId, `${canvasBaseUrl}/api/v1/courses`, "Canvas courses request");
+
+  let payload: unknown;
+
+  try {
+    payload = JSON.parse(bodyText) as unknown;
+  } catch (error) {
+    throw new Error(
+      error instanceof Error
+        ? `Canvas courses response was not valid JSON: ${error.message}`
+        : "Canvas courses response was not valid JSON.",
+    );
+  }
+
+  if (!Array.isArray(payload)) {
+    throw new Error("Canvas courses response did not return an array.");
+  }
+
+  const courses = payload.filter(isCanvasCourse).map((course) => normalizeCourse(course as unknown as Record<string, unknown>));
+  const activeCourses = courses.filter((course) => course.workflow_state === "available");
+
+  console.log(`[Dueable][Canvas API] Retrieved ${activeCourses.length} active courses.`);
+  console.log("[Dueable][Canvas API] Active course names:", activeCourses.map((course) => course.name));
+
+  return activeCourses;
+}

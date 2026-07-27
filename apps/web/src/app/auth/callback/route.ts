@@ -1,0 +1,18 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+export async function GET(request: NextRequest) {
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get("code");
+  const next = requestUrl.searchParams.get("next") || "/onboarding";
+
+  if (code) {
+    const supabase = await createSupabaseServerClient();
+    await supabase.auth.exchangeCodeForSession(code);
+  }
+
+  const redirectUrl = new URL(request.url);
+  redirectUrl.pathname = next.startsWith("/") ? next : "/onboarding";
+  redirectUrl.search = "";
+  return NextResponse.redirect(redirectUrl);
+}

@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Dueable",
+  "description": "Canvas focus coach for Dueable.",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "Dueable",
+    "default_popup": "dist/index.html"
+  },
+  "permissions": ["activeTab", "storage", "tabs", "scripting"],
+  "host_permissions": ["*://*/courses/*", "*://*/assignments/*", "*://*.instructure.com/*", "http://localhost:3000/*", "https://localhost:3000/*"],
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*/courses/*", "*://*/assignments/*", "*://*.instructure.com/*"],
+      "js": ["dist/content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
