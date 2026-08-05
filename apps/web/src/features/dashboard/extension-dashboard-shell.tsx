@@ -650,14 +650,15 @@ export function ExtensionDashboardShell({
   const availableQueueCounts = useMemo(
     () => ({
       thisWeek: weeklyAssignments.length,
-      overdue: overview.overdue.length,
+      overdue: overview.overdue.length + overview.closedOverdue.length,
       workAhead: overview.workAhead.length,
     }),
-    [overview.overdue.length, overview.workAhead.length, weeklyAssignments.length],
+    [overview.closedOverdue.length, overview.overdue.length, overview.workAhead.length, weeklyAssignments.length],
   );
   const showQueueTabs = availableQueueCounts.thisWeek > 0 || availableQueueCounts.overdue > 0 || availableQueueCounts.workAhead > 0;
   const showCaughtUpState = weeklyAssignments.length === 0 && revealedQueue === null;
   const showOverdueEmptyState = activeQueueTab === "overdue" && !displayedAssignment;
+  const showWorkAheadEmptyState = activeQueueTab === "work_ahead" && !displayedAssignment;
   const upcomingSectionTitle = activeQueueTab === "overdue" ? "Overdue" : activeQueueTab === "work_ahead" ? "Work Ahead" : "This Week";
 
   function scrollToTop() {
@@ -771,17 +772,16 @@ Welcome          </h1>
         <section className="rounded-[24px] border border-[#e2ebf7] bg-white px-3 py-3 shadow-[0_18px_34px_-28px_rgba(15,23,42,0.12)]">
           <div className="flex flex-wrap gap-2">
             {([
-              { key: "this_week", label: "This Week", count: availableQueueCounts.thisWeek, disabled: false },
-              { key: "overdue", label: "Overdue", count: availableQueueCounts.overdue, disabled: availableQueueCounts.overdue === 0 },
-              { key: "work_ahead", label: "Work Ahead", count: availableQueueCounts.workAhead, disabled: availableQueueCounts.workAhead === 0 },
+              { key: "this_week", label: "This Week", count: availableQueueCounts.thisWeek },
+              { key: "overdue", label: "Overdue", count: availableQueueCounts.overdue },
+              { key: "work_ahead", label: "Work Ahead", count: availableQueueCounts.workAhead },
             ] as const).map((tab) => (
               <button
                 key={tab.key}
                 type="button"
                 className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition ${
                   activeQueueTab === tab.key ? "bg-[#15295c] text-white" : "bg-[#f5f8ff] text-[#59708d]"
-                } disabled:cursor-not-allowed disabled:opacity-45`}
-                disabled={tab.disabled}
+                }`}
                 onClick={() => {
                   setSelectedAssignmentId(null);
                   setShowClosedOverdueAssignments(false);
@@ -898,6 +898,13 @@ Welcome          </h1>
         <section className="rounded-[26px] border border-[#d9e4f7] bg-white px-6 py-6 text-[#4f5f79] shadow-[0_24px_48px_-36px_rgba(53,88,154,0.2)]">
           <h2 className="text-[1.5rem] font-semibold tracking-[-0.03em] text-[#15295c]">No overdue assignments are still available</h2>
           <p className="mt-3 text-[1rem] leading-8 text-[#6f7f99]">Anything past due without an active Canvas availability window is hidden from this queue.</p>
+        </section>
+      ) : null}
+
+      {showWorkAheadEmptyState ? (
+        <section className="rounded-[26px] border border-[#d9e4f7] bg-white px-6 py-6 text-[#4f5f79] shadow-[0_24px_48px_-36px_rgba(53,88,154,0.2)]">
+          <h2 className="text-[1.5rem] font-semibold tracking-[-0.03em] text-[#15295c]">No work-ahead assignments are ready right now</h2>
+          <p className="mt-3 text-[1rem] leading-8 text-[#6f7f99]">Dueable only moves larger future assignments into this queue when they are worth starting early.</p>
         </section>
       ) : null}
 
