@@ -45,6 +45,7 @@ export interface Database {
           canvas_base_url: string;
           canvas_course_id: string;
           title: string;
+          course_color: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -54,6 +55,7 @@ export interface Database {
           canvas_base_url?: string;
           canvas_course_id: string;
           title: string;
+          course_color?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -63,6 +65,7 @@ export interface Database {
           canvas_base_url?: string;
           canvas_course_id?: string;
           title?: string;
+          course_color?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -84,6 +87,7 @@ export interface Database {
           title: string;
           description: string;
           due_date: string;
+          available_until: string | null;
           estimated_hours: number;
           points_possible: number | null;
           status: AssignmentStatusRow;
@@ -97,6 +101,7 @@ export interface Database {
           title: string;
           description?: string;
           due_date: string;
+          available_until?: string | null;
           estimated_hours?: number;
           points_possible?: number | null;
           status?: AssignmentStatusRow;
@@ -110,6 +115,7 @@ export interface Database {
           title?: string;
           description?: string;
           due_date?: string;
+          available_until?: string | null;
           estimated_hours?: number;
           points_possible?: number | null;
           status?: AssignmentStatusRow;

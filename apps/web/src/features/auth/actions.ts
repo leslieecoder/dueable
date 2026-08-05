@@ -80,6 +80,20 @@ async function getAppOrigin() {
   return "http://localhost:3000";
 }
 
+async function resendSignupVerification(email: string, next: string) {
+  const supabase = await createSupabaseServerClient();
+  const origin = await getAppOrigin();
+  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next.startsWith("/") ? next : "/onboarding")}`;
+
+  await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: redirectTo,
+    },
+  });
+}
+
 export async function loginAction(
   _previousState: AuthActionState,
   formData: FormData,
@@ -87,6 +101,7 @@ export async function loginAction(
   const email = readField(formData, "email");
   const password = readField(formData, "password");
   const next = readField(formData, "next") || "/onboarding";
+  const normalizedEmail = email.toLowerCase();
 
   if (!email || !password) {
     return {
@@ -97,11 +112,26 @@ export async function loginAction(
 
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: email.toLowerCase(),
+    email: normalizedEmail,
     password,
   });
 
   if (error || !data.user?.email) {
+    const loweredMessage = error?.message?.toLowerCase() ?? "";
+
+    if (loweredMessage.includes("email not confirmed")) {
+      try {
+        await resendSignupVerification(normalizedEmail, next);
+      } catch {
+        // Keep the login UX focused on the next action even if resend fails.
+      }
+
+      return {
+        status: "success",
+        message: "We sent a verification email. Open it to confirm your account, then log in again.",
+      };
+    }
+
     return {
       status: "error",
       message: normalizeAuthErrorMessage(error?.message, "login"),
@@ -126,11 +156,19 @@ export async function signupAction(
   const name = readField(formData, "name");
   const email = readField(formData, "email");
   const password = readField(formData, "password");
+  const confirmPassword = readField(formData, "confirmPassword");
 
-  if (!name || !email || !password) {
+  if (!name || !email || !password || !confirmPassword) {
     return {
       status: "error",
-      message: "Name, email, and password are required.",
+      message: "Name, email, password, and password confirmation are required.",
+    };
+  }
+
+  if (password !== confirmPassword) {
+    return {
+      status: "error",
+      message: "Passwords must match.",
     };
   }
 

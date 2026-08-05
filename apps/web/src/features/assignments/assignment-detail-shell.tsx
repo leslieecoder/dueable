@@ -78,35 +78,43 @@ export function AssignmentDetailShell({ assignment }: { assignment: AssignmentDe
 
   return (
     <main className="mx-auto max-w-4xl space-y-6">
-      <div>
+      <div className="space-y-4">
         <Link href="/assignments" className="text-sm font-medium text-[#7b88a2]">
           ← Back to assignments
         </Link>
-        <h1 className="mt-4 text-[3rem] leading-[0.95] tracking-tighter text-[#15295c] sm:text-[3.9rem]">{assignment.title}</h1>
+        <h1 className="dueable-display text-[3rem] leading-[0.95] tracking-[-0.05em] text-[#15295c] sm:text-[3.9rem]">{assignment.title}</h1>
         <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
           <span className="rounded-full bg-[#edf3ff] px-3 py-1.5 font-semibold text-[#2d6cdf]">{assignment.courseTitle}</span>
           <span className="rounded-full bg-[#fff1e7] px-3 py-1.5 font-semibold text-[#ff6e60]">{formatDueTag(assignment.dueDate)}</span>
+          {pointsLabel ? <span className="rounded-full bg-[#f4f8ff] px-3 py-1.5 font-semibold text-[#5b6e8d]">{pointsLabel}</span> : null}
           <span className="rounded-full bg-[#f2f4f8] px-3 py-1.5 font-semibold text-[#838b99]">{formatHours(assignment.estimatedHours)}</span>
         </div>
-        <p className="mt-4 text-[1.05rem] leading-8 text-[#6f7f99]">{buildSummary(assignment)}</p>
+        <p className="text-[1.05rem] leading-8 text-[#6f7f99]">{buildSummary(assignment)}</p>
       </div>
 
-      <section className="rounded-4xl bg-[#3f73e5] p-6 text-white shadow-[0_28px_60px_-36px_rgba(45,108,223,0.45)] sm:p-8">
-        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-white/75">Your next step</p>
-        <h2 className="mt-4 text-[2.35rem] leading-tight tracking-[-0.04em]">{firstOpenTask?.title ?? "Everything here is finished"}</h2>
-        <p className="mt-4 text-sm text-white/80">{firstOpenTask ? `${firstOpenTask.estimatedMinutes} min` : "All checklist steps are done."}</p>
-        <a href={firstActionAnchor} className="mt-7 inline-flex min-h-14 w-full items-center justify-center rounded-2xl bg-white px-7 py-4 text-[1.05rem] font-semibold text-[#2d6cdf]">
+      <section className="dueable-soft-panel rounded-[30px] p-6 sm:p-8">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-[#ff7a1a] px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-white">#1 Priority</span>
+          <span className="rounded-full bg-[#b9df6f] px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[#486229]">Work ahead</span>
+        </div>
+        <p className="mt-4 text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-[#6e87a7]">Your next step</p>
+        <h2 className="mt-4 text-[2.35rem] leading-tight tracking-[-0.04em] text-[#24395c]">{firstOpenTask?.title ?? "Everything here is finished"}</h2>
+        <div className="mt-4 flex flex-wrap gap-3 text-sm text-[#607087]">
+          <span className="rounded-full border border-[#dfe7f5] bg-white px-4 py-2">{firstOpenTask ? `${firstOpenTask.estimatedMinutes} min` : "All checklist steps are done."}</span>
+          <span className="rounded-full border border-[#dfe7f5] bg-white px-4 py-2">{assignment.completedTasks}/{assignment.totalTasks} completed</span>
+        </div>
+        <a href={firstActionAnchor} className="dueable-button-primary mt-7 inline-flex min-h-14 w-full items-center justify-center px-7 py-4 text-[1.05rem] font-semibold text-white">
           Start this step
         </a>
       </section>
 
-      <section>
+      <section className="space-y-2">
         <div className="flex items-center justify-between text-sm font-medium text-[#6f7f99]">
           <span>{assignment.totalTasks > 0 ? `Step ${Math.max(firstOpenIndex + 1, 1)} of ${assignment.totalTasks}` : "No steps yet"}</span>
           <span>{progressPercent}%</span>
         </div>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#dfe7fb]">
-          <div className="h-full rounded-full bg-[#3f73e5]" style={{ width: `${progressPercent}%` }} />
+          <div className="h-full rounded-full bg-[linear-gradient(135deg,#2ec5a0,#2d6cdf)]" style={{ width: `${progressPercent}%` }} />
         </div>
       </section>
 
@@ -119,30 +127,33 @@ export function AssignmentDetailShell({ assignment }: { assignment: AssignmentDe
               <input type="hidden" name="completed" value={task.completed ? "false" : "true"} />
               <button
                 type="submit"
-                className={`flex w-full items-center justify-between gap-4 rounded-[18px] border px-4 py-4 text-left shadow-[0_18px_42px_-34px_rgba(15,23,42,0.18)] ${
+                className={`flex w-full items-center justify-between gap-4 rounded-[18px] border px-4 py-4 text-left shadow-[0_18px_42px_-34px_rgba(15,23,42,0.12)] ${
                   task.completed
                     ? "border-[#bfead9] bg-[#eefcf5] text-[#5f7f73]"
-                    : "border-[#e7ecf4] bg-white text-[#1d2940]"
+                    : "border-[#e7ecf4] bg-[linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(247,250,255,0.96))] text-[#1d2940]"
                 }`}
               >
                 <span className="flex min-w-0 items-center gap-3">
-                  <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-sm font-semibold ${task.completed ? "bg-[#32c49a] text-white" : "border border-[#3f73e5] text-[#3f73e5]"}`}>
+                  <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-sm font-semibold ${task.completed ? "bg-[#32c49a] text-white" : "border border-[#2ec5a0] text-[#2ec5a0]"}`}>
                     {task.completed ? "✓" : ""}
                   </span>
-                  <span className={`text-[1rem] font-medium ${task.completed ? "line-through" : ""}`}>{task.title}</span>
+                  <span className="flex min-w-0 flex-col">
+                    <span className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[#9aa7bd]">Step {task.order + 1}</span>
+                    <span className={`text-[1rem] font-medium ${task.completed ? "line-through" : ""}`}>{task.title}</span>
+                  </span>
                 </span>
                 <span className="shrink-0 text-sm text-[#97a0b0]">{task.estimatedMinutes} min</span>
               </button>
             </form>
           ))
         ) : (
-          <div className="rounded-[18px] border border-dashed border-[#dbe3f1] bg-white px-5 py-6 text-base leading-8 text-[#6b7a94]">
+          <div className="dueable-soft-panel rounded-[18px] border border-dashed px-5 py-6 text-base leading-8 text-[#6b7a94]">
             No steps have been created for this assignment yet.
           </div>
         )}
       </section>
 
-      <details id="instructions" className="rounded-[18px] border border-[#e7ecf4] bg-white px-5 py-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.18)]" open>
+      <details id="instructions" className="dueable-soft-panel rounded-[18px] px-5 py-4" open>
         <summary className="cursor-pointer text-[1rem] font-semibold text-[#1d2940]">View original assignment instructions</summary>
         <div className="mt-4">
           {instructionsHtml ? (

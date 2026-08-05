@@ -7,7 +7,10 @@ export interface ExtensionOverviewFocus {
     id: string;
     title: string;
     course: string;
+    courseColor: string | null;
     dueDate: string;
+    dateLabel: string;
+    assignmentUrl: string | null;
     points: number | null;
   };
   steps: ExtensionOverviewStep[];
@@ -18,26 +21,42 @@ export interface ExtensionOverviewFocus {
   estimatedHours: number;
   difficulty: string;
   priorityLabel: string;
+  planProvider: string | null;
+  badgeLabel: string | null;
 }
 
 export interface ExtensionOverviewAssignment {
   id: string;
   title: string;
   courseTitle: string;
+  courseColor: string | null;
   dueDate: string;
+  dateLabel: string;
+  assignmentUrl: string | null;
   estimatedHours: number;
   pointsPossible: number | null;
   difficulty: string;
+  priorityLabel: string;
+  planProvider: string | null;
+  badgeLabel: string | null;
+  steps: ExtensionOverviewStep[];
+  progress: {
+    completedSteps: number;
+    totalSteps: number;
+  };
 }
 
 export interface ExtensionOverviewResponse {
   synced: boolean;
   focus: ExtensionOverviewFocus | null;
   upcoming: ExtensionOverviewAssignment[];
+  workAhead: ExtensionOverviewAssignment[];
+  overdue: ExtensionOverviewAssignment[];
+  closedOverdue: ExtensionOverviewAssignment[];
   error?: string;
 }
 
 export interface FormattedUpcomingAssignment extends ExtensionOverviewAssignment {
-  formattedDueDate: string;
+  formattedDueText: string;
   formattedPoints: string | null;
 }

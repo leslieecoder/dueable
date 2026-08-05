@@ -7,4 +7,6 @@ export interface PlannerGenerationResult {
   plan: PlannerPlan;
   provider: string;
   fallbackUsed: boolean;
+  primaryProvider: string;
+  primaryError: string | null;
 }

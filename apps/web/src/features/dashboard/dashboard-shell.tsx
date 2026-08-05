@@ -66,13 +66,13 @@ export function DashboardShell({
 
   return (
     <main className="space-y-8">
-      <header className="space-y-4 px-1 pt-3">
-        <span className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#2d6cdf] shadow-[0_14px_28px_-22px_rgba(45,108,223,0.55)]">
+      <header className="space-y-4 px-1 pt-1">
+        <span className="inline-flex items-center gap-2 rounded-full border border-[#d7e5f8] bg-white px-4 py-2 text-sm font-semibold text-[#2d6cdf] shadow-[0_14px_28px_-24px_rgba(45,108,223,0.26)]">
           <Sparkles className="h-4 w-4" /> Today
         </span>
         <div className="max-w-4xl space-y-3">
           <p className="text-sm font-medium uppercase tracking-[0.18em] text-[#8d99af]">{greeting}</p>
-          <h1 className="text-[3.45rem] leading-[0.94] tracking-[-0.06em] text-[#15295c] sm:text-[4.6rem]">
+          <h1 className="dueable-display text-[3.2rem] leading-[0.94] tracking-[-0.06em] text-[#15295c] sm:text-[4.1rem]">
             {firstName}, here&apos;s what deserves your attention.
           </h1>
           <p className="max-w-2xl text-[1.05rem] leading-8 text-[#6f7f99]">{overview.focusQuestion}</p>
@@ -80,70 +80,73 @@ export function DashboardShell({
       </header>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_320px]">
-        <article className="overflow-hidden rounded-[36px] bg-[#3f73e5] text-white shadow-[0_34px_70px_-42px_rgba(45,108,223,0.58)]">
+        <article className="overflow-hidden rounded-[36px] border border-[#d9e4f7] bg-[linear-gradient(180deg,_#f3f7ff_0%,_#edf2ff_100%)] text-[#173d4d] shadow-[0_32px_62px_-42px_rgba(53,88,154,0.3)]">
           <div className="space-y-8 px-7 py-7 sm:px-9 sm:py-9">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-3">
-                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.24em] text-white/72">Work on next</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-[#ff7a1a] px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-white">#1 Priority</span>
+                  <span className="rounded-full bg-[#b9df6f] px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[#486229]">Work ahead</span>
+                </div>
                 {spotlightTask ? (
                   <>
-                    <p className="text-[0.98rem] font-medium text-white/78">{spotlightTask.courseTitle}</p>
-                    <h2 className="max-w-3xl text-[2.8rem] leading-[0.95] tracking-tighter sm:text-[3.9rem]">{spotlightTask.assignmentTitle}</h2>
+                    <p className="text-[0.98rem] font-medium text-[#607087]">{spotlightTask.courseTitle}</p>
+                    <h2 className="max-w-3xl text-[2.5rem] leading-[0.98] tracking-[-0.05em] text-[#24395c] sm:text-[3.2rem]">{spotlightTask.assignmentTitle}</h2>
                   </>
                 ) : (
                   <>
-                    <p className="text-[0.98rem] font-medium text-white/78">You&apos;re in good shape</p>
-                    <h2 className="max-w-3xl text-[2.8rem] leading-[0.95] tracking-tighter sm:text-[3.9rem]">You are caught up right now.</h2>
+                    <p className="text-[0.98rem] font-medium text-[#607087]">You&apos;re in good shape</p>
+                    <h2 className="max-w-3xl text-[2.5rem] leading-[0.98] tracking-[-0.05em] text-[#24395c] sm:text-[3.2rem]">You are caught up right now.</h2>
                   </>
                 )}
               </div>
 
-              <div className="rounded-3xl bg-white/12 px-5 py-4 backdrop-blur-sm">
-                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-white/65">Progress</p>
-                <p className="mt-3 text-[2.2rem] font-semibold tracking-[-0.04em]">{overview.progress.completionPercent}%</p>
-                <p className="mt-1 text-sm text-white/72">{formatProgressCopy(overview)}</p>
+              <div className="rounded-[24px] border border-white/80 bg-white/84 px-5 py-4 backdrop-blur-sm">
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-[#8d99af]">Progress</p>
+                <p className="mt-3 text-[2.2rem] font-semibold tracking-[-0.04em] text-[#24395c]">{overview.progress.completionPercent}%</p>
+                <p className="mt-1 text-sm text-[#6f7f99]">{formatProgressCopy(overview)}</p>
               </div>
             </div>
 
             {spotlightTask ? (
               <>
-                <div className="flex flex-wrap gap-3 text-sm font-medium text-white/84">
-                  <span className="rounded-full bg-white/14 px-4 py-2">Due {formatDueDate(spotlightTask.dueDate)}</span>
-                  <span className="rounded-full bg-white/14 px-4 py-2">{formatMinutes(spotlightTask.estimatedMinutes)}</span>
-                  <span className="rounded-full bg-white/14 px-4 py-2">{overview.progress.activeAssignments} active assignments</span>
+                <div className="flex flex-wrap gap-3 text-sm font-medium text-[#6f7f99]">
+                  <span className="rounded-full border border-[#dfe7f5] bg-white px-4 py-2">Due {formatDueDate(spotlightTask.dueDate)}</span>
+                  <span className="rounded-full border border-[#dfe7f5] bg-white px-4 py-2">{formatMinutes(spotlightTask.estimatedMinutes)}</span>
+                  <span className="rounded-full border border-[#dfe7f5] bg-white px-4 py-2">{overview.progress.activeAssignments} active assignments</span>
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
-                  <div className="rounded-[28px] bg-white px-6 py-6 text-[#173d4d] shadow-[0_24px_52px_-34px_rgba(15,23,42,0.42)]">
-                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-[#6e87a7]">Your next step</p>
+                  <div className="rounded-[28px] border border-white/80 bg-white px-6 py-6 text-[#173d4d] shadow-[0_24px_52px_-34px_rgba(15,23,42,0.18)]">
+                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-[#6e87a7]">Step {Math.max(overview.progress.completedTasks + 1, 1)}</p>
                     <p className="mt-4 text-[2rem] font-semibold leading-tight tracking-[-0.04em]">{spotlightTask.title}</p>
                     <p className="mt-4 text-[1rem] leading-8 text-[#5f728d]">Stay with this one piece first. The goal is to start cleanly, not finish the whole assignment at once.</p>
                     <Link
                       href={`/assignments/${spotlightTask.assignmentId}`}
-                      className="mt-7 inline-flex min-h-14 items-center justify-center rounded-full bg-[#3f73e5] px-7 py-4 text-[1rem] font-semibold text-white"
+                      className="dueable-button-primary mt-7 inline-flex min-h-14 items-center justify-center px-7 py-4 text-[1rem] font-semibold text-white"
                     >
                       Open action plan <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </div>
 
                   <div className="grid gap-4">
-                    <div className="rounded-[26px] bg-[#2f61cd] px-5 py-5">
-                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-white/62">Planned today</p>
-                      <p className="mt-3 text-[2.15rem] font-semibold tracking-[-0.04em]">{overview.progress.plannedMinutesToday}</p>
-                      <p className="mt-1 text-sm text-white/72">minutes of focused work</p>
+                    <div className="rounded-[26px] border border-white/80 bg-white px-5 py-5">
+                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-[#8d99af]">Planned today</p>
+                      <p className="mt-3 text-[2.15rem] font-semibold tracking-[-0.04em] text-[#24395c]">{overview.progress.plannedMinutesToday}</p>
+                      <p className="mt-1 text-sm text-[#6f7f99]">minutes of focused work</p>
                     </div>
-                    <div className="rounded-[26px] bg-[#2f61cd] px-5 py-5">
-                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-white/62">Completed</p>
-                      <p className="mt-3 text-[2.15rem] font-semibold tracking-[-0.04em]">{overview.progress.completedTasks}</p>
-                      <p className="mt-1 text-sm text-white/72">steps finished</p>
+                    <div className="rounded-[26px] border border-white/80 bg-white px-5 py-5">
+                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-[#8d99af]">Completed</p>
+                      <p className="mt-3 text-[2.15rem] font-semibold tracking-[-0.04em] text-[#24395c]">{overview.progress.completedTasks}</p>
+                      <p className="mt-1 text-sm text-[#6f7f99]">steps finished</p>
                     </div>
                   </div>
                 </div>
               </>
             ) : (
-              <div className="rounded-[28px] bg-white px-6 py-6 text-[#173d4d] shadow-[0_24px_52px_-34px_rgba(15,23,42,0.42)]">
+              <div className="rounded-[28px] border border-white/80 bg-white px-6 py-6 text-[#173d4d] shadow-[0_24px_52px_-34px_rgba(15,23,42,0.18)]">
                 <p className="text-[1rem] leading-8 text-[#5f728d]">There is nothing urgent pulling at you. Use your weekly plan to get ahead before something becomes stressful.</p>
-                <Link href="/assignments" className="mt-7 inline-flex min-h-14 items-center justify-center rounded-full bg-[#3f73e5] px-7 py-4 text-[1rem] font-semibold text-white">
+                <Link href="/assignments" className="dueable-button-primary mt-7 inline-flex min-h-14 items-center justify-center px-7 py-4 text-[1rem] font-semibold text-white">
                   Review your week
                 </Link>
               </div>
@@ -151,13 +154,13 @@ export function DashboardShell({
           </div>
 
           {activated ? (
-            <div className="border-t border-white/10 bg-[#3869d6] px-7 py-4 text-sm text-white/82 sm:px-9">
+            <div className="border-t border-[#d9e4f7] bg-white/60 px-7 py-4 text-sm text-[#607087] sm:px-9">
               Your semester is ready. Dueable will keep reordering this plan as you finish steps.
             </div>
           ) : null}
         </article>
 
-        <aside className="space-y-4 rounded-4xl bg-white px-5 py-5 shadow-[0_24px_58px_-40px_rgba(15,23,42,0.22)]">
+        <aside className="dueable-soft-panel space-y-4 rounded-[32px] px-5 py-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-[#8d99af]">This week</p>
@@ -173,7 +176,7 @@ export function DashboardShell({
                   key={assignment.id}
                   href={`/assignments/${assignment.id}`}
                   className={`block rounded-3xl border px-4 py-4 transition ${
-                    index === 0 ? "border-[#dbe5ff] bg-[#f5f8ff]" : "border-[#edf1f7] bg-[#fbfcff] hover:bg-white"
+                    index === 0 ? "border-[#dbe5ff] bg-[#f5f8ff]" : "border-[#edf1f7] bg-white/78 hover:bg-white"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">

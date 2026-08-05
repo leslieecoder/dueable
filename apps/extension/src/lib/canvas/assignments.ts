@@ -6,6 +6,7 @@ export interface CanvasAssignment {
   name: string;
   description?: string;
   dueAt?: string;
+  availableUntil?: string;
   pointsPossible?: number;
   htmlUrl?: string;
 }
@@ -16,6 +17,7 @@ interface CanvasAssignmentApiResponse {
   name?: unknown;
   description?: unknown;
   due_at?: unknown;
+  lock_at?: unknown;
   points_possible?: unknown;
   html_url?: unknown;
 }
@@ -51,6 +53,7 @@ function normalizeAssignment(rawAssignment: CanvasAssignmentApiResponse, courseI
     name: rawAssignment.name,
     description: typeof rawAssignment.description === "string" ? rawAssignment.description : undefined,
     dueAt: typeof rawAssignment.due_at === "string" ? rawAssignment.due_at : undefined,
+    availableUntil: typeof rawAssignment.lock_at === "string" ? rawAssignment.lock_at : undefined,
     pointsPossible: typeof rawAssignment.points_possible === "number" ? rawAssignment.points_possible : undefined,
     htmlUrl: typeof rawAssignment.html_url === "string" ? rawAssignment.html_url : undefined,
   };
@@ -68,6 +71,7 @@ async function fetchAssignmentsPage(tabId: number, url: string) {
       error instanceof Error
         ? `Canvas assignments response was not valid JSON: ${error.message}`
         : "Canvas assignments response was not valid JSON.",
+      { cause: error },
     );
   }
 

@@ -8,22 +8,22 @@ const toneClasses: Record<TimelineTone, { badge: string; border: string; button:
   blue: {
     badge: "bg-[#edf3ff] text-[#2d6cdf]",
     border: "border-l-[#2d6cdf]",
-    button: "bg-[#3f73e5] text-white",
+    button: "dueable-button-primary text-white",
   },
   purple: {
     badge: "bg-[#f1ebff] text-[#8d79f5]",
     border: "border-l-[#a78bfa]",
-    button: "bg-[#9b7ff3] text-white",
+    button: "bg-[#f1ebff] text-[#6d58c7]",
   },
   green: {
     badge: "bg-[#e8fbf4] text-[#19805f]",
     border: "border-l-[#32c49a]",
-    button: "bg-[#32c49a] text-white",
+    button: "dueable-button-primary text-white",
   },
   peach: {
     badge: "bg-[#fff1e7] text-[#ff9d62]",
     border: "border-l-[#ffb98a]",
-    button: "bg-[#ffb27c] text-white",
+    button: "bg-[#fff1e7] text-[#c77743]",
   },
 };
 
@@ -117,23 +117,28 @@ export default async function AssignmentsPage() {
 
   return (
     <main className="max-w-5xl space-y-10">
-      <header className="max-w-3xl">
-        <p className="dueable-eyebrow text-[#9aa7bd]">Assignments</p>
-        <h1 className="dueable-display mt-4 text-[3.5rem] leading-[0.95] tracking-tighter text-[#0f172a] sm:text-[4.5rem]">Your Week</h1>
-        <p className="mt-5 text-[1.05rem] leading-8 text-[#7b88a2]">Dueable organized your assignments based on urgency, grade impact, and estimated effort.</p>
+      <header className="max-w-4xl space-y-4">
+        <span className="inline-flex items-center gap-2 rounded-full border border-[#d7e5f8] bg-white px-4 py-2 text-sm font-semibold text-[#2d6cdf] shadow-[0_14px_28px_-24px_rgba(45,108,223,0.2)]">
+          Weekly plan
+        </span>
+        <div className="space-y-3">
+          <p className="dueable-eyebrow text-[#9aa7bd]">Assignments</p>
+          <h1 className="dueable-display text-[3.3rem] leading-[0.95] tracking-[-0.05em] text-[#15295c] sm:text-[4.15rem]">Your week at a glance.</h1>
+          <p className="max-w-2xl text-[1.05rem] leading-8 text-[#7b88a2]">Dueable organized your assignments based on urgency, grade impact, and estimated effort.</p>
+        </div>
       </header>
 
-      <section className="relative space-y-10 before:absolute before:bottom-0 before:left-[13px] before:top-2 before:w-px before:bg-[#d7ddea]">
+      <section className="relative space-y-10 before:absolute before:bottom-0 before:left-[15px] before:top-2 before:w-px before:bg-[#dce4f1]">
         {orderedGroups.map(([key, items], groupIndex) => {
           const { weekday, shortDate } = formatDateParts(key);
 
           return (
             <div key={key} className="relative grid gap-4 pl-10">
-              <div className="absolute left-0 top-2 h-3 w-3 rounded-full bg-[#2d6cdf] ring-4 ring-[#f5f7fa]" />
+              <div className="absolute left-0 top-2 h-4 w-4 rounded-full bg-[linear-gradient(135deg,_#1dc9b2,_#2d6cdf)] ring-4 ring-[#f7fbff]" />
               <div className="flex items-baseline gap-3">
-                <h2 className="text-[2rem] tracking-[-0.04em] text-[#15295c]">{weekday}</h2>
+                <h2 className="dueable-display text-[1.95rem] tracking-[-0.04em] text-[#15295c]">{weekday}</h2>
                 <span className="text-sm text-[#8a93a5]">{shortDate}</span>
-                {groupIndex === 0 ? <span className="rounded-full bg-[#3f73e5] px-2.5 py-1 text-xs font-semibold text-white">Today</span> : null}
+                {groupIndex === 0 ? <span className="rounded-full bg-[linear-gradient(135deg,_#2ec5a0,_#1fb78f)] px-2.5 py-1 text-xs font-semibold text-white">Today</span> : null}
               </div>
 
               <div className="space-y-5">
@@ -143,21 +148,24 @@ export default async function AssignmentsPage() {
                   const pointsLabel = formatPoints(assignment.pointsPossible);
 
                   return (
-                    <article key={assignment.id} className={`rounded-[28px] border border-white/80 border-l-4 ${tone.border} bg-white p-5 shadow-[0_22px_50px_-34px_rgba(15,23,42,0.2)] sm:p-6`}>
+                    <article key={assignment.id} className={`dueable-soft-panel rounded-[28px] border-l-4 ${tone.border} p-5 sm:p-6`}>
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="space-y-3">
-                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${tone.badge}`}>{tag.label}</span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${tone.badge}`}>{tag.label}</span>
+                            {index === 0 && groupIndex === 0 ? <span className="rounded-full bg-[#b9df6f] px-3 py-1 text-xs font-semibold text-[#486229]">Work ahead</span> : null}
+                          </div>
                           <h3 className="text-[2rem] leading-tight tracking-[-0.04em] text-[#15295c]">{assignment.title}</h3>
                           <p className="text-base text-[#7b88a2]">{assignment.courseTitle}</p>
                           <div className="flex flex-wrap gap-3 text-sm text-[#6f7f99]">
-                            <span>{formatDateParts(assignment.dueDate).dateTime}</span>
+                            <span className="rounded-full border border-[#e2e8f3] bg-white px-3 py-1.5">{formatDateParts(assignment.dueDate).dateTime}</span>
                             {pointsLabel ? <span>{pointsLabel}</span> : null}
                           </div>
                         </div>
-                        <span className="text-sm font-medium text-[#98a0af]">{formatEffort(assignment.estimatedHours)}</span>
+                        <span className="rounded-full border border-[#dfe7f5] bg-white px-3 py-1.5 text-sm font-medium text-[#607087]">{formatEffort(assignment.estimatedHours)}</span>
                       </div>
 
-                      <div className="mt-5 rounded-[18px] bg-[#f6f8fc] px-4 py-3">
+                      <div className="mt-5 rounded-[18px] border border-[#e9eef6] bg-white/82 px-4 py-3">
                         <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-[#9aa7bd]">Why today</p>
                         <p className="mt-2 text-sm leading-7 text-[#5f6f89]">{buildWhyToday(assignment.dueDate, assignment.pointsPossible)}</p>
                       </div>
@@ -174,7 +182,7 @@ export default async function AssignmentsPage() {
         })}
       </section>
 
-      <section className="rounded-[20px] bg-[#eef3fb] px-5 py-4 text-sm leading-7 text-[#4f5f79]">
+      <section className="dueable-soft-panel rounded-[20px] px-5 py-4 text-sm leading-7 text-[#4f5f79]">
         <strong>Dueable updates this plan as you work.</strong> Complete an assignment and it disappears from your week. Start a focus session and your coach adapts.
       </section>
     </main>

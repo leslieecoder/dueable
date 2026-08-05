@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dueable Web
 
-## Getting Started
+Next.js 16 web app for Dueable.
 
-First, run the development server:
+## Local development
+
+From the repo root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev:web
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The app runs at `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Copy [apps/web/.env.example](./.env.example) into your local env file and fill in real values.
 
-## Learn More
+Required for production:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.5-flash
+DUEABLE_PLANNER_PROVIDER=gemini
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Notes:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are used by browser, server, and middleware auth flows.
+- `SUPABASE_SERVICE_ROLE_KEY` is required by the assignment import and planner persistence routes.
+- `GEMINI_API_KEY` is required if `DUEABLE_PLANNER_PROVIDER=gemini`.
 
-## Deploy on Vercel
+## Deploy to Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Create the Vercel project from this monorepo and set the project root directory to `apps/web`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Recommended Vercel settings:
+
+- Framework preset: `Next.js`
+- Root directory: `apps/web`
+- Install command: leave default
+- Build command: leave default
+- Output directory: leave default
+
+Add these environment variables in Vercel for Production and Preview:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `GEMINI_API_KEY`
+- `GEMINI_MODEL`
+- `DUEABLE_PLANNER_PROVIDER`
+
+## Supabase settings required for production
+
+In Supabase Auth settings, add your deployed URLs so login and signup callbacks can return to the app:
+
+- Site URL: your production app URL, for example `https://dueable.vercel.app`
+- Redirect URL: `https://your-domain/auth/callback`
+- If you use preview deploys, also allow `https://*.vercel.app/auth/callback`
+
+## Before first production test
+
+1. Run the latest Supabase migrations against your hosted database.
+2. Deploy the web app to Vercel.
+3. Confirm login works on the deployed domain.
+4. Update the extension build to use the deployed app origin with `VITE_DUEABLE_WEB_ORIGIN`.
+5. Add the deployed app URL to the extension host permissions before shipping the extension build publicly.
+
+## Verification
+
+The current app builds successfully with:
+
+```bash
+npm run build --workspace @dueable/web
+```

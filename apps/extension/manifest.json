@@ -4,10 +4,18 @@
   "description": "Canvas focus coach for Dueable.",
   "version": "0.1.0",
   "action": {
-    "default_title": "Dueable",
-    "default_popup": "dist/index.html"
+    "default_title": "Dueable"
   },
-  "permissions": ["activeTab", "storage", "tabs", "scripting"],
+  "icons": {
+    "16": "public/assets/logo.png",
+    "32": "public/assets/logo.png",
+    "48": "public/assets/logo.png",
+    "128": "public/assets/logo.png"
+  },
+  "permissions": ["activeTab", "storage", "tabs", "scripting", "sidePanel"],
+  "side_panel": {
+    "default_path": "dist/index.html"
+  },
   "host_permissions": ["*://*/courses/*", "*://*/assignments/*", "*://*.instructure.com/*", "http://localhost:3000/*", "https://localhost:3000/*"],
   "background": {
     "service_worker": "dist/background.js",

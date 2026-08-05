@@ -39,6 +39,7 @@ export interface AssignmentListItem {
   title: string;
   courseTitle: string;
   dueDate: string;
+  availableUntil: string | null;
   estimatedHours: number;
   pointsPossible: number | null;
 }
@@ -48,11 +49,15 @@ export interface AssignmentDetailData {
   title: string;
   description: string;
   dueDate: string;
+  availableUntil: string | null;
   estimatedHours: number;
   pointsPossible: number | null;
   status: AssignmentStatus;
   courseTitle: string;
+  courseColor: string | null;
   courseId: string;
+  canvasBaseUrl: string;
+  canvasCourseId: string;
   progressPercent: number;
   completedTasks: number;
   totalTasks: number;
@@ -167,6 +172,7 @@ function mapAssignmentRowToDomain(assignment: AssignmentRow): Assignment {
     title: assignment.title,
     description: assignment.description,
     dueDate: assignment.due_date,
+    availableUntil: assignment.available_until,
     estimatedHours: assignment.estimated_hours,
     pointsPossible: assignment.points_possible,
     status: assignment.status,
@@ -177,7 +183,7 @@ async function fetchAssignmentBundles() {
   const supabase = await createSupabaseServerClient();
   const assignmentResult = await supabase
     .from("assignments")
-    .select("id, course_id, canvas_assignment_id, title, description, due_date, estimated_hours, points_possible, status, created_at, updated_at")
+    .select("id, course_id, canvas_assignment_id, title, description, due_date, available_until, estimated_hours, points_possible, status, created_at, updated_at")
     .order("due_date", { ascending: true });
 
   if (assignmentResult.error) {
@@ -189,7 +195,7 @@ async function fetchAssignmentBundles() {
   const assignmentIds = assignments.map((assignment) => assignment.id);
 
   const courseResult = courseIds.length
-    ? await supabase.from("courses").select("id, user_id, canvas_base_url, canvas_course_id, title, created_at, updated_at").in("id", courseIds)
+    ? await supabase.from("courses").select("id, user_id, canvas_base_url, canvas_course_id, title, course_color, created_at, updated_at").in("id", courseIds)
     : { data: [] as CourseRow[], error: null };
 
   if (courseResult.error) {
@@ -353,11 +359,15 @@ export async function getAssignmentDetail(assignmentId: string): Promise<Assignm
     title: bundle.assignment.title,
     description: bundle.assignment.description,
     dueDate: bundle.assignment.due_date,
+    availableUntil: bundle.assignment.available_until,
     estimatedHours: bundle.assignment.estimated_hours,
     pointsPossible: bundle.assignment.points_possible,
     status: bundle.assignment.status,
     courseTitle: bundle.course.title,
+    courseColor: bundle.course.course_color,
     courseId: bundle.course.id,
+    canvasBaseUrl: bundle.course.canvas_base_url,
+    canvasCourseId: bundle.course.canvas_course_id,
     progressPercent: bundle.progressPercent,
     completedTasks: bundle.completedTasks,
     totalTasks: bundle.tasks.length,
@@ -383,6 +393,7 @@ export async function getAssignmentList(): Promise<AssignmentListItem[]> {
     title: bundle.assignment.title,
     courseTitle: bundle.course.title,
     dueDate: bundle.assignment.due_date,
+    availableUntil: bundle.assignment.available_until,
     estimatedHours: bundle.assignment.estimated_hours,
     pointsPossible: bundle.assignment.points_possible,
   }));

@@ -3,6 +3,7 @@ export interface CanvasSelectorStrategy {
   assignmentTitle: string[];
   assignmentDescription: string[];
   dueDate: string[];
+  availableUntil: string[];
   courseTitle: string[];
 }
 
@@ -17,6 +18,15 @@ export const canvasSelectorStrategies: CanvasSelectorStrategy[] = [
       ".details .due_at",
       ".assignment-date-due",
       "time[data-testid='assignment-due-date']",
+    ],
+    availableUntil: [
+      ".student-assignment-overview .available_until",
+      ".student-assignment-overview .lock_at",
+      ".details .available_until",
+      ".details .lock_at",
+      ".student-assignment-overview",
+      ".details",
+      "aside",
     ],
     courseTitle: [
       "#breadcrumbs li:nth-child(2) .ellipsible",
@@ -34,6 +44,15 @@ export const canvasSelectorStrategies: CanvasSelectorStrategy[] = [
       "main time",
       "[role='main'] .due-date",
       "aside time",
+    ],
+    availableUntil: [
+      "main .student-assignment-overview .available_until",
+      "main .student-assignment-overview .lock_at",
+      "[role='main'] .details .available_until",
+      "[role='main'] .details .lock_at",
+      "main .student-assignment-overview",
+      "[role='main'] .details",
+      "aside",
     ],
     courseTitle: [
       "#breadcrumbs li:nth-child(2) .ellipsible",

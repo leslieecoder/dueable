@@ -1,13 +1,30 @@
 import { NextResponse, type NextRequest } from "next/server";
+import type { Assignment, AssignmentStatus, Json } from "@dueable/types";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createPlannerService } from "@/services/planner/PlannerService";
+import { formatCanvasAssignmentDescription } from "@/lib/canvas/assignment-description";
 
 interface ImportAssignmentRequest {
   courseTitle: string;
+  courseColor?: string | null;
   assignmentTitle: string;
   assignmentDescription: string;
   dueDate: string | null;
+  availableUntil?: string | null;
   sourceUrl: string;
+}
+
+interface PersistedAssignmentRow {
+  id: string;
+  course_id: string;
+  canvas_assignment_id: string;
+  title: string;
+  description: string;
+  due_date: string;
+  available_until: string | null;
+  estimated_hours: number;
+  status: AssignmentStatus;
 }
 
 const monthIndexes: Record<string, number> = {
@@ -97,20 +114,25 @@ function parseCanvasSourceUrl(sourceUrl: string) {
   };
 }
 
-function parseDueDate(rawDueDate: string | null) {
-  const visibleDueDate = normalizeText(rawDueDate);
+function parseCanvasVisibleDate(rawValue: string | null | undefined, options: { required: boolean; missingMessage?: string }) {
+  const visibleDate = normalizeText(rawValue);
 
-  if (!visibleDueDate) {
-    throw new Error("This Canvas assignment does not show a visible due date, so it cannot be imported yet.");
+  if (!visibleDate) {
+    if (options.required) {
+      throw new Error(options.missingMessage ?? "This Canvas assignment does not show a visible date.");
+    }
+
+    return null;
   }
 
-  const directDate = new Date(visibleDueDate);
+  const directDate = new Date(visibleDate);
   if (!Number.isNaN(directDate.getTime())) {
     return directDate.toISOString();
   }
 
-  const normalized = visibleDueDate
+  const normalized = visibleDate
     .replace(/^due\s+/i, "")
+    .replace(/^available\s+until\s+/i, "")
     .replace(/\s+by\s+/i, " ")
     .replace(/,/g, " ")
     .replace(/\s+/g, " ")
@@ -123,7 +145,7 @@ function parseDueDate(rawDueDate: string | null) {
     const weekdayIndex = weekdayIndexes[weekdayToken.toLowerCase()];
 
     if (weekdayIndex === undefined) {
-      throw new Error(`Unable to parse the Canvas due weekday: ${visibleDueDate}`);
+      throw new Error(`Unable to parse the Canvas date weekday: ${visibleDate}`);
     }
 
     const now = new Date();
@@ -155,14 +177,14 @@ function parseDueDate(rawDueDate: string | null) {
   );
 
   if (!match) {
-    throw new Error(`Unable to parse the Canvas due date: ${visibleDueDate}`);
+    throw new Error(`Unable to parse the Canvas date: ${visibleDate}`);
   }
 
   const [, , monthToken, dayToken, yearToken, hourToken, minuteToken, meridiemToken] = match;
   const monthIndex = monthIndexes[monthToken.slice(0, 3).toLowerCase()];
 
   if (monthIndex === undefined) {
-    throw new Error(`Unable to parse the Canvas due month: ${visibleDueDate}`);
+    throw new Error(`Unable to parse the Canvas date month: ${visibleDate}`);
   }
 
   const now = new Date();
@@ -191,6 +213,102 @@ function parseDueDate(rawDueDate: string | null) {
   return parsed.toISOString();
 }
 
+function parseDueDate(rawDueDate: string | null) {
+  return parseCanvasVisibleDate(rawDueDate, {
+    required: true,
+    missingMessage: "This Canvas assignment does not show a visible due date, so it cannot be imported yet.",
+  });
+}
+
+function parseAvailableUntil(rawAvailableUntil: string | null | undefined) {
+  return parseCanvasVisibleDate(rawAvailableUntil, { required: false });
+}
+
+function mapAssignmentRowToDomain(assignment: PersistedAssignmentRow): Assignment {
+  return {
+    id: assignment.id,
+    courseId: assignment.course_id,
+    canvasAssignmentId: assignment.canvas_assignment_id,
+    title: assignment.title,
+    description: assignment.description,
+    dueDate: assignment.due_date,
+    availableUntil: assignment.available_until,
+    estimatedHours: assignment.estimated_hours,
+    status: assignment.status,
+  };
+}
+
+async function generateChecklistForAssignment(supabase: ReturnType<typeof createSupabaseAdminClient>, assignment: PersistedAssignmentRow) {
+  const existingTasksResult = await supabase
+    .from("tasks")
+    .select("id")
+    .eq("assignment_id", assignment.id)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingTasksResult.error) {
+    throw new Error(existingTasksResult.error.message ?? "Unable to inspect existing assignment tasks.");
+  }
+
+  if (existingTasksResult.data) {
+    return false;
+  }
+
+  const planner = createPlannerService();
+  const planResult = await planner.generatePlan(mapAssignmentRowToDomain(assignment));
+  const plan = planResult.plan;
+
+  if (plan.tasks.length === 0) {
+    return false;
+  }
+
+  const planInsertResult = await supabase
+    .from("assignment_plans")
+    .insert({
+      assignment_id: assignment.id,
+      provider_used: planResult.provider,
+      plan_type: plan.type,
+      title: plan.title,
+      difficulty: plan.difficulty,
+      estimated_hours: plan.estimatedHours,
+      estimated_days: plan.estimatedDays,
+      plan_snapshot: plan as unknown as Json,
+    })
+    .select("id")
+    .single();
+
+  if (planInsertResult.error || !planInsertResult.data) {
+    throw new Error(planInsertResult.error?.message ?? `Unable to store a generated plan for ${assignment.title}.`);
+  }
+
+  const taskInsertResult = await supabase.from("tasks").insert(
+    plan.tasks.map((task, index) => ({
+      assignment_id: assignment.id,
+      title: task.title,
+      description: task.description,
+      estimated_minutes: task.estimatedMinutes,
+      order: index,
+      source_plan_id: planInsertResult.data.id,
+    })),
+  );
+
+  if (taskInsertResult.error) {
+    await supabase.from("assignment_plans").delete().eq("id", planInsertResult.data.id);
+    throw new Error(taskInsertResult.error.message ?? `Unable to store generated tasks for ${assignment.title}.`);
+  }
+
+  const assignmentUpdateResult = await supabase
+    .from("assignments")
+    .update({ estimated_hours: plan.estimatedHours })
+    .eq("id", assignment.id);
+
+  if (assignmentUpdateResult.error) {
+    throw new Error(assignmentUpdateResult.error.message ?? `Unable to update the estimated hours for ${assignment.title}.`);
+  }
+
+  return true;
+}
+
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
@@ -211,9 +329,12 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json()) as Partial<ImportAssignmentRequest>;
     const courseTitle = normalizeText(body.courseTitle);
+    const courseColor = normalizeText(body.courseColor) || null;
     const assignmentTitle = normalizeText(body.assignmentTitle);
-    const assignmentDescription = normalizeText(body.assignmentDescription);
     const sourceUrl = normalizeText(body.sourceUrl);
+    const assignmentDescription = formatCanvasAssignmentDescription(body.assignmentDescription, {
+      pageUrl: sourceUrl,
+    });
 
     if (!courseTitle || !assignmentTitle || !sourceUrl) {
       return jsonWithCors(
@@ -224,6 +345,7 @@ export async function POST(request: NextRequest) {
     }
 
     const dueDate = parseDueDate(body.dueDate ?? null);
+    const availableUntil = parseAvailableUntil(body.availableUntil);
     const { canvasBaseUrl, canvasCourseId, canvasAssignmentId } = parseCanvasSourceUrl(sourceUrl);
     const profileName =
       typeof authUser.user_metadata.name === "string" && authUser.user_metadata.name.trim().length > 0
@@ -256,6 +378,7 @@ export async function POST(request: NextRequest) {
           canvas_base_url: canvasBaseUrl,
           canvas_course_id: canvasCourseId,
           title: courseTitle,
+          course_color: courseColor,
         },
         { onConflict: "user_id,canvas_base_url,canvas_course_id" },
       )
@@ -275,15 +398,18 @@ export async function POST(request: NextRequest) {
           title: assignmentTitle,
           description: assignmentDescription,
           due_date: dueDate,
+          available_until: availableUntil,
         },
         { onConflict: "course_id,canvas_assignment_id" },
       )
-      .select("id, title, due_date, status")
+      .select("id, course_id, canvas_assignment_id, title, description, due_date, available_until, estimated_hours, status")
       .single();
 
     if (assignment.error || !assignment.data) {
       throw new Error(assignment.error?.message ?? "Unable to save the Canvas assignment.");
     }
+
+    const planGenerated = await generateChecklistForAssignment(supabase, assignment.data as PersistedAssignmentRow);
 
     return jsonWithCors(
       {
@@ -295,6 +421,7 @@ export async function POST(request: NextRequest) {
           status: assignment.data.status,
           courseTitle: course.data.title,
         },
+        planGenerated,
       },
       { status: 200 },
       request,

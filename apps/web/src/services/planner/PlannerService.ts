@@ -23,14 +23,19 @@ class DefaultPlannerService implements PlannerService {
         plan,
         provider: this.primaryProvider.name,
         fallbackUsed: false,
+        primaryProvider: this.primaryProvider.name,
+        primaryError: null,
       };
-    } catch {
+    } catch (error) {
+      const primaryError = error instanceof Error ? error.message : "Primary planner provider failed.";
       const plan = await this.fallbackProvider.generatePlan(assignment);
 
       return {
         plan,
         provider: this.fallbackProvider.name,
         fallbackUsed: true,
+        primaryProvider: this.primaryProvider.name,
+        primaryError,
       };
     }
   }

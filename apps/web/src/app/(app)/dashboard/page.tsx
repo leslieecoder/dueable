@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { DashboardShell } from "@/features/dashboard/dashboard-shell";
-import { getDashboardOverview } from "@/features/assignments/data";
+import { getExtensionOverview } from "@/app/api/extension/shared";
+import { ExtensionDashboardShell } from "@/features/dashboard/extension-dashboard-shell";
 import { hasImportedAssignments, requireUser } from "@/lib/auth/session";
 
 export default async function DashboardPage({
@@ -16,7 +16,7 @@ export default async function DashboardPage({
   }
 
   const { activated } = await searchParams;
-  const overview = await getDashboardOverview(user.name);
+  const overview = await getExtensionOverview();
 
-  return <DashboardShell user={user} overview={overview} activated={activated === "1"} />;
+  return <ExtensionDashboardShell initialOverview={overview} activated={activated === "1"} />;
 }

@@ -16,27 +16,29 @@ export function TodaysStepCard({
   isCompletingAssignment?: boolean;
   onCompleteAssignment?: () => void;
 }) {
+  const stepNumber = step ? step.order + 1 : null;
+
   return (
     <section className="popup-panel">
-      <div className="today-step-shell">
-        <div>
-          <p className="section-label">Today's step</p>
-          <h3 className="today-step-title">{step ? step.title : "You finished every step"}</h3>
-          {step?.description ? <p className="panel-copy">{step.description}</p> : null}
-        </div>
-
-        {step?.estimatedMinutes ? <p className="today-step-time">{step.estimatedMinutes} min</p> : null}
-
+      <div className="today-step-shell checklist-shell">
         <div className="steps-progress-block">
-          <p className="steps-heading">Progress</p>
-          <p className="steps-progress-copy">{`${progress.completedSteps} / ${progress.totalSteps} steps completed`}</p>
+          <p className="steps-progress-copy">{`${progress.completedSteps}/${progress.totalSteps} completed`}</p>
           <ProgressIndicator completed={progress.completedSteps} total={progress.totalSteps} label="" />
         </div>
 
         {step ? (
-          <button type="button" className="primary-button" onClick={() => onToggle(!step.completed)} disabled={isPending}>
-            {isPending ? "Saving step..." : step.completed ? "Mark Step Incomplete" : "Mark Step Complete"}
-          </button>
+          <div className="current-step-card">
+            <div className="current-step-copy">
+              <p className="step-chip">{stepNumber ? `Step ${stepNumber}` : "Current step"}</p>
+              <h3 className="today-step-title">{step.title}</h3>
+              {step?.estimatedMinutes ? <p className="today-step-time">{step.estimatedMinutes} min</p> : null}
+              {step?.description ? <p className="panel-copy">{step.description}</p> : null}
+            </div>
+
+            <button type="button" className="step-toggle-button" onClick={() => onToggle(!step.completed)} disabled={isPending}>
+              {isPending ? "Saving..." : "Mark complete"}
+            </button>
+          </div>
         ) : (
           <div className="inline-complete-card">
             <div className="inline-complete-check">✓</div>

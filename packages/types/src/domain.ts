@@ -20,6 +20,7 @@ export interface Assignment {
   title: string;
   description: string;
   dueDate: string;
+  availableUntil?: string | null;
   estimatedHours: number;
   pointsPossible?: number | null;
   status: AssignmentStatus;

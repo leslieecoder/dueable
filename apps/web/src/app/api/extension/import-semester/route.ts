@@ -1,14 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { formatCanvasAssignmentDescription } from "@/lib/canvas/assignment-description";
 
 interface ImportSemesterAssignmentRequest {
   id: number;
   courseId: number;
   courseName: string;
+  courseColor?: string | null;
   name: string;
   description?: string;
   dueAt?: string;
+  availableUntil?: string;
   pointsPossible?: number;
   htmlUrl?: string;
 }
@@ -84,6 +87,22 @@ function parseCanvasDueDate(rawDueAt: string | undefined) {
   return parsed.toISOString();
 }
 
+function parseCanvasAvailableUntil(rawAvailableUntil: string | undefined) {
+  const availableUntil = normalizeText(rawAvailableUntil);
+
+  if (!availableUntil) {
+    return null;
+  }
+
+  const parsed = new Date(availableUntil);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toISOString();
+}
+
 export async function OPTIONS(request: NextRequest) {
   return new NextResponse(null, {
     status: 204,
@@ -141,7 +160,7 @@ export async function POST(request: NextRequest) {
       throw new Error(profile.error?.message ?? "Unable to load the current Dueable user profile.");
     }
 
-    const courseMap = new Map<string, { canvasBaseUrl: string; canvasCourseId: string; title: string }>();
+    const courseMap = new Map<string, { canvasBaseUrl: string; canvasCourseId: string; title: string; courseColor: string | null }>();
 
     for (const assignment of body.assignments) {
       if (typeof assignment?.courseId !== "number") {
@@ -163,6 +182,7 @@ export async function POST(request: NextRequest) {
           canvasBaseUrl,
           canvasCourseId,
           title: courseTitle,
+          courseColor: normalizeText(assignment.courseColor) || null,
         });
       }
     }
@@ -172,13 +192,14 @@ export async function POST(request: NextRequest) {
       canvas_base_url: course.canvasBaseUrl,
       canvas_course_id: course.canvasCourseId,
       title: course.title,
+      course_color: course.courseColor,
     }));
 
     const coursesResult = coursesToUpsert.length
       ? await supabase
           .from("courses")
           .upsert(coursesToUpsert, { onConflict: "user_id,canvas_base_url,canvas_course_id" })
-          .select("id, title, canvas_base_url, canvas_course_id")
+          .select("id, title, canvas_base_url, canvas_course_id, course_color")
       : { data: [], error: null };
 
     if (coursesResult.error) {
@@ -186,7 +207,15 @@ export async function POST(request: NextRequest) {
     }
 
     const persistedCourseMap = new Map((coursesResult.data ?? []).map((course) => [`${course.canvas_base_url}:${course.canvas_course_id}`, course]));
-    const assignmentMap = new Map<string, { course_id: string; canvas_assignment_id: string; title: string; description: string; due_date: string; points_possible: number | null }>();
+    const assignmentMap = new Map<string, {
+      course_id: string;
+      canvas_assignment_id: string;
+      title: string;
+      description: string;
+      due_date: string;
+      available_until: string | null;
+      points_possible: number | null;
+    }>();
 
     for (const assignment of body.assignments) {
       if (typeof assignment?.id !== "number" || typeof assignment.courseId !== "number") {
@@ -194,8 +223,12 @@ export async function POST(request: NextRequest) {
       }
 
       const title = normalizeText(assignment.name);
-      const description = normalizeText(assignment.description);
+      const description = formatCanvasAssignmentDescription(assignment.description, {
+        baseUrl: canvasBaseUrl,
+        pageUrl: assignment.htmlUrl,
+      });
       const dueDate = parseCanvasDueDate(assignment.dueAt);
+      const availableUntil = parseCanvasAvailableUntil(assignment.availableUntil);
       const course = persistedCourseMap.get(`${canvasBaseUrl}:${String(assignment.courseId)}`);
 
       if (!title || !dueDate || !course) {
@@ -211,6 +244,7 @@ export async function POST(request: NextRequest) {
         title,
         description,
         due_date: dueDate,
+        available_until: availableUntil,
         points_possible: Number.isFinite(assignment.pointsPossible) ? assignment.pointsPossible ?? null : null,
       });
     }
@@ -232,6 +266,7 @@ export async function POST(request: NextRequest) {
         success: true,
         coursesImported: coursesToUpsert.length,
         assignmentsImported: assignmentsToUpsert.length,
+        assignmentIds: (assignmentsResult.data ?? []).map((assignment) => assignment.id),
       },
       { status: 200 },
       request,
