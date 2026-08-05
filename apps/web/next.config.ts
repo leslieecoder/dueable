@@ -2,7 +2,7 @@ import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@dueable/lib", "@dueable/types", "@dueable/ui"],
+  transpilePackages: ["@dueable/types"],
   turbopack: {
     root: path.join(__dirname, "../.."),
   },
