@@ -16,7 +16,7 @@
   "side_panel": {
     "default_path": "index.html"
   },
-  "host_permissions": ["*://*/courses/*", "*://*/assignments/*", "*://*.instructure.com/*", "http://localhost:3000/*", "https://localhost:3000/*"],
+  "host_permissions": ["*://*/courses/*", "*://*/assignments/*", "*://*.instructure.com/*", "http://localhost:3000/*", "https://localhost:3000/*", "https://dueable-web.vercel.app/*"],
   "background": {
     "service_worker": "background.js",
     "type": "module"
