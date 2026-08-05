@@ -21,66 +21,7 @@ interface ImportSemesterResponse {
   success?: boolean;
   coursesImported?: number;
   assignmentsImported?: number;
-  assignmentIds?: string[];
   error?: string;
-}
-
-interface GenerateMissingPlansResponse {
-  success?: boolean;
-  generatedCount?: number;
-  replacedCount?: number;
-  skippedCount?: number;
-  failedCount?: number;
-  fallbackCount?: number;
-  primaryProvider?: string | null;
-  primaryError?: string | null;
-  error?: string;
-}
-
-function getPlanGenerationFeedback(payload: GenerateMissingPlansResponse) {
-  const generatedCount = payload.generatedCount ?? 0;
-  const replacedCount = payload.replacedCount ?? 0;
-  const skippedCount = payload.skippedCount ?? 0;
-  const failedCount = payload.failedCount ?? 0;
-  const fallbackCount = payload.fallbackCount ?? 0;
-  const primaryProvider = payload.primaryProvider ?? "Gemini";
-  const primaryError = payload.primaryError ?? null;
-
-  if (fallbackCount > 0) {
-    const providerLabel = primaryProvider.replace(/^gemini:/, "Gemini ");
-
-    if (primaryError?.toLowerCase().includes("permission_denied") || primaryError?.toLowerCase().includes("unregistered callers")) {
-      return `Dueable generated steps with the fallback planner because ${providerLabel} rejected the configured API key.`;
-    }
-
-    return `Dueable generated steps with the fallback planner because ${providerLabel} failed.`;
-  }
-
-  if (replacedCount > 0 && failedCount === 0) {
-    return `Replaced ${replacedCount} assignment plan${replacedCount === 1 ? "" : "s"} with Gemini-generated steps.`;
-  }
-
-  if (replacedCount > 0 && failedCount > 0) {
-    return `Replaced ${replacedCount} assignment plan${replacedCount === 1 ? "" : "s"}, but ${failedCount} assignment${failedCount === 1 ? "" : "s"} still need Gemini steps.`;
-  }
-
-  if (generatedCount > 0 && failedCount === 0) {
-    return `Generated ${generatedCount} assignment plan${generatedCount === 1 ? "" : "s"}.`;
-  }
-
-  if (generatedCount > 0 && failedCount > 0) {
-    return `Generated ${generatedCount} plan${generatedCount === 1 ? "" : "s"}, but ${failedCount} assignment${failedCount === 1 ? "" : "s"} still need steps.`;
-  }
-
-  if (failedCount > 0) {
-    return `Your assignments imported, but ${failedCount} assignment${failedCount === 1 ? "" : "s"} could not get steps yet.`;
-  }
-
-  if (skippedCount > 0) {
-    return "Your assignment steps were already available.";
-  }
-
-  return null;
 }
 
 interface CompleteAssignmentResponse {
@@ -147,7 +88,7 @@ function getQueueAssignmentIds(payload: ExtensionOverviewResponse, queue: Planne
 const FIRST_LOGIN_REDIRECT_KEY = "dueableHasOpenedLoginFromPanel";
 const ASSIGNMENT_COMPLETED_AUTO_ADVANCE_MS = 1400;
 
-function buildImportProgressState(progress: CanvasSemesterImportProgress | { stage: "generating_steps"; importedAssignments: number }): ImportProgressState {
+function buildImportProgressState(progress: CanvasSemesterImportProgress): ImportProgressState {
   switch (progress.stage) {
     case "loading_courses":
       return {
@@ -173,12 +114,6 @@ function buildImportProgressState(progress: CanvasSemesterImportProgress | { sta
         percent: 76,
         label: "Saving assignments to Dueable",
         detail: `Imported ${progress.importedAssignments} assignments. Saving them now.`,
-      };
-    case "generating_steps":
-      return {
-        percent: 92,
-        label: "Generating your study steps",
-        detail: "Turning imported assignments into actionable steps.",
       };
     case "done":
       return {
@@ -358,10 +293,6 @@ function formatPoints(pointsPossible: number | null) {
   return `${Number.isInteger(pointsPossible) ? pointsPossible.toFixed(0) : pointsPossible.toFixed(1)} pts`;
 }
 
-function isGeminiProvider(provider: string | null | undefined) {
-  return typeof provider === "string" && provider.toLowerCase().startsWith("gemini");
-}
-
 function App() {
   const popupShellRef = useRef<HTMLElement | null>(null);
   const [viewState, setViewState] = useState<PopupViewState>("loading");
@@ -379,9 +310,6 @@ function App() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [showClosedOverdueAssignments, setShowClosedOverdueAssignments] = useState(false);
   const [revealedQueue, setRevealedQueue] = useState<PlannerQueueView>(null);
-  const attemptedPlanRecoveryIdsRef = useRef<Set<string>>(new Set());
-  const attemptedGeminiUpgradeIdsRef = useRef<Set<string>>(new Set());
-
   const handleOpenLogin = useCallback(async (options?: { markFirstVisit?: boolean }) => {
     if (options?.markFirstVisit) {
       await setStoredFlag(FIRST_LOGIN_REDIRECT_KEY, true);
@@ -474,105 +402,6 @@ function App() {
       }
 
       if (payload.synced) {
-        const focusAssignmentId = payload.focus?.assignment.id ?? null;
-        const focusHasNoSteps = payload.focus !== null && payload.focus.progress.totalSteps === 0;
-        const primaryAssignments = payload.focus ? [payload.focus, ...payload.upcoming] : payload.workAhead;
-        const visibleAssignments = primaryAssignments.filter((assignment): assignment is NonNullable<typeof assignment> => assignment !== null);
-        const visibleAssignmentIds = primaryAssignments.map((assignment) => ("assignment" in assignment ? assignment.assignment.id : assignment.id)).filter(
-          (assignmentId): assignmentId is string => typeof assignmentId === "string" && assignmentId.length > 0,
-        );
-        const geminiUpgradeCandidateIds = visibleAssignments
-          .filter((assignment) => assignment.progress.completedSteps === 0)
-          .filter((assignment) => !isGeminiProvider(assignment.planProvider))
-          .map((assignment) => ("assignment" in assignment ? assignment.assignment.id : assignment.id))
-          .filter((assignmentId) => !attemptedGeminiUpgradeIdsRef.current.has(assignmentId));
-
-        if (focusAssignmentId && !focusHasNoSteps) {
-          attemptedPlanRecoveryIdsRef.current.delete(focusAssignmentId);
-        }
-
-        for (const assignment of visibleAssignments) {
-          const assignmentId = "assignment" in assignment ? assignment.assignment.id : assignment.id;
-
-          if (isGeminiProvider(assignment.planProvider) || assignment.progress.completedSteps > 0) {
-            attemptedGeminiUpgradeIdsRef.current.delete(assignmentId);
-          }
-        }
-
-        if (focusAssignmentId && focusHasNoSteps && !attemptedPlanRecoveryIdsRef.current.has(focusAssignmentId)) {
-          attemptedPlanRecoveryIdsRef.current.add(focusAssignmentId);
-
-          const planResponse = await fetch(getDueableUrl("/api/extension/generate-missing-plans"), {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ assignmentIds: visibleAssignmentIds }),
-          });
-
-          const planPayload = (await planResponse.json()) as GenerateMissingPlansResponse;
-
-          if (planResponse.ok && planPayload.success && (planPayload.generatedCount ?? 0) > 0) {
-            const refreshedOverviewResponse = await fetch(getDueableUrl("/api/extension/overview"), {
-              method: "GET",
-              credentials: "include",
-              headers: {
-                Accept: "application/json",
-              },
-            });
-
-            const refreshedPayload = (await refreshedOverviewResponse.json()) as ExtensionOverviewResponse;
-
-            if (refreshedOverviewResponse.ok) {
-              setOverview(refreshedPayload);
-              setFeedbackMessage(`Generated ${(planPayload.generatedCount ?? 0)} assignment plan${(planPayload.generatedCount ?? 0) === 1 ? "" : "s"}.`);
-            } else {
-              setFeedbackMessage(getFriendlyExtensionMessage("overview", refreshedPayload.error));
-            }
-          } else if ((planPayload.failedCount ?? 0) > 0) {
-            setFeedbackMessage(`Dueable found this assignment, but its study steps could not be generated yet.`);
-          }
-        }
-
-        if (geminiUpgradeCandidateIds.length > 0) {
-          for (const assignmentId of geminiUpgradeCandidateIds) {
-            attemptedGeminiUpgradeIdsRef.current.add(assignmentId);
-          }
-
-          const planResponse = await fetch(getDueableUrl("/api/extension/generate-missing-plans"), {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ assignmentIds: geminiUpgradeCandidateIds, replaceExisting: true }),
-          });
-
-          const planPayload = (await planResponse.json()) as GenerateMissingPlansResponse;
-
-          if (planResponse.ok && planPayload.success && ((planPayload.replacedCount ?? 0) > 0 || (planPayload.generatedCount ?? 0) > 0)) {
-            const refreshedOverviewResponse = await fetch(getDueableUrl("/api/extension/overview"), {
-              method: "GET",
-              credentials: "include",
-              headers: {
-                Accept: "application/json",
-              },
-            });
-
-            const refreshedPayload = (await refreshedOverviewResponse.json()) as ExtensionOverviewResponse;
-
-            if (refreshedOverviewResponse.ok) {
-              setOverview(refreshedPayload);
-              setFeedbackMessage(getPlanGenerationFeedback(planPayload));
-            } else {
-              setFeedbackMessage(getFriendlyExtensionMessage("overview", refreshedPayload.error));
-            }
-          } else if ((planPayload.failedCount ?? 0) > 0 || (planPayload.fallbackCount ?? 0) > 0) {
-            setFeedbackMessage(getPlanGenerationFeedback(planPayload));
-          }
-        }
-
         setCurrentCanvasCourses([]);
         setViewState("ready");
         return;
@@ -718,32 +547,6 @@ function App() {
         throw new Error(getFriendlyExtensionMessage("import", payload.error));
       }
 
-      setImportProgress(
-        buildImportProgressState({
-          stage: "generating_steps",
-          importedAssignments: payload.assignmentsImported ?? result.assignmentsImported,
-        }),
-      );
-
-      const planResponse = await fetch(getDueableUrl("/api/extension/generate-missing-plans"), {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(
-          Array.isArray(payload.assignmentIds) && payload.assignmentIds.length > 0
-            ? { assignmentIds: payload.assignmentIds }
-            : { limit: 25 },
-        ),
-      });
-
-      const planPayload = (await planResponse.json()) as GenerateMissingPlansResponse;
-
-      if (!planResponse.ok || !planPayload.success) {
-        throw new Error(planPayload.error ?? "Your assignments imported, but we couldn't generate steps yet.");
-      }
-
       setImportProgress({
         percent: 100,
         label: "Import complete",
@@ -754,7 +557,7 @@ function App() {
         coursesImported: payload.coursesImported ?? result.coursesImported,
         assignmentsImported: payload.assignmentsImported ?? result.assignmentsImported,
       });
-      setFeedbackMessage(getPlanGenerationFeedback(planPayload));
+      setFeedbackMessage("Your assignments are ready. Pick one and start a focus block.");
     } catch (error) {
       setImportStage("idle");
       setImportProgress(null);

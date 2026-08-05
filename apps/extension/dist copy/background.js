@@ -1,0 +1,1 @@
+chrome.runtime.onInstalled.addListener(()=>{chrome.storage.local.set({dueableExtensionReady:!0}),chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:!0})}),chrome.runtime.onStartup.addListener(()=>{chrome.sidePanel.setPanelBehavior({openPanelOnActionClick:!0})});

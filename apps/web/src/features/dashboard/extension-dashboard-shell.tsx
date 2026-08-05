@@ -1,8 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
 import Link from "next/link";
-import { CheckCircle2, ChevronDown, ExternalLink } from "lucide-react";
+import { CheckCircle2, ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type PlannerQueueView = "work_ahead" | "overdue" | null;
@@ -68,13 +67,6 @@ interface ExtensionOverviewPayload {
   closedOverdue: ExtensionOverviewAssignment[];
 }
 
-interface ToggleTaskResponse {
-  success?: boolean;
-  task?: ExtensionOverviewStep;
-  progress?: ExtensionOverviewAssignment["progress"];
-  error?: string;
-}
-
 interface CompleteAssignmentResponse {
   success?: boolean;
   overview?: ExtensionOverviewPayload;
@@ -87,15 +79,119 @@ interface CompletionState {
 }
 
 const ASSIGNMENT_COMPLETED_AUTO_ADVANCE_MS = 1400;
+const WORK_MINUTES = 20;
+const SHORT_BREAK_MINUTES = 5;
+const LONG_BREAK_MINUTES = 15;
+const WORK_SESSIONS_UNTIL_LONG_BREAK = 4;
+const TIMER_STORAGE_KEY = "dueable-web-pomodoro-timer";
 
-function sortSteps(steps: ExtensionOverviewStep[]) {
-  return [...steps].sort((left, right) => left.order - right.order);
+type TimerPhase = "work" | "short_break" | "long_break";
+
+interface StoredTimerState {
+  assignmentId: string;
+  phase: TimerPhase;
+  secondsRemaining: number;
+  isTimerRunning: boolean;
+  completedFocusBlocks: number;
+  endsAt: number | null;
 }
 
-function calculateProgress(steps: ExtensionOverviewStep[]) {
+function getPhaseDurationSeconds(phase: TimerPhase) {
+  if (phase === "work") {
+    return WORK_MINUTES * 60;
+  }
+
+  if (phase === "short_break") {
+    return SHORT_BREAK_MINUTES * 60;
+  }
+
+  return LONG_BREAK_MINUTES * 60;
+}
+
+function getPhaseLabel(phase: TimerPhase) {
+  if (phase === "work") {
+    return "Focus session";
+  }
+
+  if (phase === "short_break") {
+    return "Short break";
+  }
+
+  return "Long break";
+}
+
+function getPhasePrompt(phase: TimerPhase) {
+  if (phase === "work") {
+    return "Stay with this assignment for one focused block.";
+  }
+
+  if (phase === "short_break") {
+    return "Step away for a short reset, then come back.";
+  }
+
+  return "You earned a longer reset before your next round.";
+}
+
+function formatTimer(secondsRemaining: number) {
+  const safeSeconds = Math.max(0, secondsRemaining);
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function getStoredStateForAssignment(
+  storedState: StoredTimerState | null,
+  assignmentId: string,
+): (StoredTimerState & { statusMessage: string | null }) | null {
+  if (!storedState || storedState.assignmentId !== assignmentId) {
+    return null;
+  }
+
+  if (!storedState.isTimerRunning || storedState.endsAt === null) {
+    return {
+      ...storedState,
+      secondsRemaining: Math.max(0, storedState.secondsRemaining),
+      statusMessage: null,
+    };
+  }
+
+  const nextSecondsRemaining = Math.ceil((storedState.endsAt - Date.now()) / 1000);
+
+  if (nextSecondsRemaining > 0) {
+    return {
+      ...storedState,
+      secondsRemaining: nextSecondsRemaining,
+      statusMessage: null,
+    };
+  }
+
+  if (storedState.phase === "work") {
+    const nextCompletedFocusBlocks = storedState.completedFocusBlocks + 1;
+    const nextPhase = nextCompletedFocusBlocks % WORK_SESSIONS_UNTIL_LONG_BREAK === 0 ? "long_break" : "short_break";
+
+    return {
+      assignmentId,
+      phase: nextPhase,
+      secondsRemaining: getPhaseDurationSeconds(nextPhase),
+      isTimerRunning: false,
+      completedFocusBlocks: nextCompletedFocusBlocks,
+      endsAt: null,
+      statusMessage:
+        nextPhase === "long_break"
+          ? "Your focus block finished while you were away. Take a longer break before you come back."
+          : "Your focus block finished while you were away. Take a short break, then restart when you're ready.",
+    };
+  }
+
   return {
-    completedSteps: steps.filter((step) => step.completed).length,
-    totalSteps: steps.length,
+    assignmentId,
+    phase: "work",
+    secondsRemaining: getPhaseDurationSeconds("work"),
+    isTimerRunning: false,
+    completedFocusBlocks: storedState.completedFocusBlocks,
+    endsAt: null,
+    statusMessage: "Your break finished while you were away. Start your next focus block when you're ready.",
   };
 }
 
@@ -194,41 +290,6 @@ function buildCourseCodePillStyle(courseColor: string | null | undefined) {
   };
 }
 
-function renderLinkedText(text: string) {
-  const urlPattern = /(https?:\/\/[^\s<]+[^\s<.,!?;:])/g;
-  const matches = Array.from(text.matchAll(urlPattern));
-
-  if (matches.length === 0) {
-    return text;
-  }
-
-  const parts: ReactNode[] = [];
-  let lastIndex = 0;
-
-  for (const match of matches) {
-    const url = match[0];
-    const startIndex = match.index ?? 0;
-
-    if (startIndex > lastIndex) {
-      parts.push(text.slice(lastIndex, startIndex));
-    }
-
-    parts.push(
-      <a key={`${url}-${startIndex}`} href={url} target="_blank" rel="noreferrer" className="font-semibold text-[#2d6cdf] underline underline-offset-2">
-        {url}
-      </a>,
-    );
-
-    lastIndex = startIndex + url.length;
-  }
-
-  if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
-  }
-
-  return parts;
-}
-
 function getWeeklyAssignments(payload: ExtensionOverviewPayload) {
   if (!payload.focus) {
     return [] as ExtensionOverviewAssignment[];
@@ -268,108 +329,106 @@ function getQueueAssignmentIds(payload: ExtensionOverviewPayload, queue: Planner
   return getWeeklyAssignments(payload).map((assignment) => assignment.id);
 }
 
-function StepChecklist({
-  steps,
-  expandedStepId,
-  pendingTaskId,
-  onExpand,
-  onToggle,
-}: {
-  steps: ExtensionOverviewStep[];
-  expandedStepId: string | null;
-  pendingTaskId: string | null;
-  onExpand: (stepId: string) => void;
-  onToggle: (stepId: string, completed: boolean) => void;
-}) {
-  if (steps.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="space-y-3">
-      {steps.map((step) => {
-        const isExpanded = expandedStepId === step.id;
-
-        return (
-          <div
-            key={step.id}
-            className={`rounded-[20px] border px-4 py-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.12)] ${
-              step.completed ? "border-[#bfead9] bg-[#eefcf5]" : "border-[#e7ecf4] bg-white"
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
-                <input
-                  type="checkbox"
-                  className="mt-1 h-4 w-4 accent-[#2ec5a0]"
-                  checked={step.completed}
-                  disabled={pendingTaskId === step.id}
-                  onChange={(event) => onToggle(step.id, event.target.checked)}
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[#8ea0ba]">{`Step ${step.order + 1}`}</span>
-                  <span className={`mt-1 block text-[1rem] font-semibold text-[#1d2940] ${step.completed ? "line-through decoration-[#5f7f73]" : ""}`}>
-                    {step.title}
-                  </span>
-                  {step.estimatedMinutes > 0 ? <span className="mt-2 block text-sm text-[#7b88a2]">{step.estimatedMinutes} min</span> : null}
-                </span>
-              </label>
-
-              <button
-                type="button"
-                className={`rounded-full border border-[#e1e8f4] bg-[#f8fbff] p-2 text-[#6f7f99] transition ${isExpanded ? "rotate-180" : ""}`}
-                onClick={() => onExpand(step.id)}
-                aria-expanded={isExpanded}
-                aria-label={`Toggle details for step ${step.order + 1}`}
-              >
-                <ChevronDown className="h-4 w-4" />
-              </button>
-            </div>
-
-            {isExpanded && step.description ? <div className="mt-4 border-t border-[#e8eef7] pt-4 text-sm leading-7 text-[#5f6f89]">{renderLinkedText(step.description)}</div> : null}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function FocusAssignmentCard({
   assignment,
   onOpenAssignment,
   onCompleteAssignment,
-  onTaskSynced,
   isCompletingAssignment,
 }: {
   assignment: ExtensionOverviewAssignment;
   onOpenAssignment: () => void;
   onCompleteAssignment: () => void;
-  onTaskSynced: () => void;
   isCompletingAssignment: boolean;
 }) {
   const isWorkAhead = assignment.badgeLabel === "Work Ahead";
-  const [steps, setSteps] = useState<ExtensionOverviewStep[]>(() => sortSteps(assignment.steps));
-  const [progress, setProgress] = useState(assignment.progress);
-  const [pendingTaskId, setPendingTaskId] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [expandedStepId, setExpandedStepId] = useState<string | null>(() => sortSteps(assignment.steps).find((step) => !step.completed)?.id ?? assignment.steps[0]?.id ?? null);
+  const [phase, setPhase] = useState<TimerPhase>("work");
+  const [secondsRemaining, setSecondsRemaining] = useState(() => getPhaseDurationSeconds("work"));
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [completedFocusBlocks, setCompletedFocusBlocks] = useState(0);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const courseDisplay = useMemo(() => splitCourseDisplayLabel(assignment.courseTitle), [assignment.courseTitle]);
   const courseCodePillStyle = useMemo(() => buildCourseCodePillStyle(assignment.courseColor), [assignment.courseColor]);
+  const suggestedFocusBlocks = useMemo(() => Math.max(1, Math.ceil(assignment.estimatedHours * 3)), [assignment.estimatedHours]);
 
   useEffect(() => {
-    const sortedSteps = sortSteps(assignment.steps);
+    const storedValue = window.localStorage.getItem(TIMER_STORAGE_KEY);
+    const nextState = getStoredStateForAssignment(storedValue ? (JSON.parse(storedValue) as StoredTimerState) : null, assignment.id);
 
-    setSteps(sortedSteps);
-    setProgress(assignment.progress);
-    setErrorMessage(null);
-    setExpandedStepId((currentExpandedStepId) => {
-      if (currentExpandedStepId && sortedSteps.some((step) => step.id === currentExpandedStepId)) {
-        return currentExpandedStepId;
-      }
+    if (!nextState) {
+      setPhase("work");
+      setSecondsRemaining(getPhaseDurationSeconds("work"));
+      setIsTimerRunning(false);
+      setCompletedFocusBlocks(0);
+      setStatusMessage(null);
+      return;
+    }
 
-      return sortedSteps.find((step) => !step.completed)?.id ?? sortedSteps[0]?.id ?? null;
-    });
-  }, [assignment.id, assignment.progress, assignment.steps]);
+    setPhase(nextState.phase);
+    setSecondsRemaining(nextState.secondsRemaining);
+    setIsTimerRunning(nextState.isTimerRunning);
+    setCompletedFocusBlocks(nextState.completedFocusBlocks);
+    setStatusMessage(nextState.statusMessage);
+  }, [assignment.id]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      TIMER_STORAGE_KEY,
+      JSON.stringify({
+        assignmentId: assignment.id,
+        phase,
+        secondsRemaining,
+        isTimerRunning,
+        completedFocusBlocks,
+        endsAt: isTimerRunning ? Date.now() + secondsRemaining * 1000 : null,
+      } satisfies StoredTimerState),
+    );
+  }, [assignment.id, completedFocusBlocks, isTimerRunning, phase, secondsRemaining]);
+
+  useEffect(() => {
+    if (!isTimerRunning) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setSecondsRemaining((currentSecondsRemaining) => {
+        if (currentSecondsRemaining > 1) {
+          return currentSecondsRemaining - 1;
+        }
+
+        window.clearInterval(intervalId);
+        setIsTimerRunning(false);
+        setPhase((currentPhase) => {
+          if (currentPhase === "work") {
+            setCompletedFocusBlocks((currentCompletedFocusBlocks) => {
+              const nextCompletedFocusBlocks = currentCompletedFocusBlocks + 1;
+              const nextPhase = nextCompletedFocusBlocks % WORK_SESSIONS_UNTIL_LONG_BREAK === 0 ? "long_break" : "short_break";
+
+              setSecondsRemaining(getPhaseDurationSeconds(nextPhase));
+              setStatusMessage(
+                nextPhase === "long_break"
+                  ? "Focus block done. Take a longer break before you come back."
+                  : "Focus block done. Take a short break, then restart when you're ready.",
+              );
+
+              return nextCompletedFocusBlocks;
+            });
+
+            return currentPhase;
+          }
+
+          setSecondsRemaining(getPhaseDurationSeconds("work"));
+          setStatusMessage("Break finished. Start your next focus block when you're ready.");
+          return "work";
+        });
+
+        return 0;
+      });
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isTimerRunning]);
 
   const metadata = useMemo(
     () => [
@@ -381,54 +440,25 @@ function FocusAssignmentCard({
     [assignment.dateLabel, assignment.dueDate, assignment.difficulty, assignment.estimatedHours, assignment.pointsPossible],
   );
 
-  const allStepsCompleted = useMemo(() => {
-    if (progress.totalSteps === 0) {
-      return true;
+  function resetTimer(nextPhase: TimerPhase = "work") {
+    setIsTimerRunning(false);
+    setPhase(nextPhase);
+    setSecondsRemaining(getPhaseDurationSeconds(nextPhase));
+    setStatusMessage(null);
+  }
+
+  function skipToNextPhase() {
+    if (phase === "work") {
+      const nextPhase = (completedFocusBlocks + 1) % WORK_SESSIONS_UNTIL_LONG_BREAK === 0 ? "long_break" : "short_break";
+
+      setCompletedFocusBlocks((currentCompletedFocusBlocks) => currentCompletedFocusBlocks + 1);
+      resetTimer(nextPhase);
+      setStatusMessage(nextPhase === "long_break" ? "Jumped into a long break." : "Jumped into a short break.");
+      return;
     }
 
-    return progress.completedSteps === progress.totalSteps;
-  }, [progress.completedSteps, progress.totalSteps]);
-
-  async function handleToggleStep(stepId: string, nextCompleted: boolean) {
-    const previousSteps = steps;
-    const nextSteps = sortSteps(steps.map((step) => (step.id === stepId ? { ...step, completed: nextCompleted } : step)));
-    const nextProgress = calculateProgress(nextSteps);
-
-    setPendingTaskId(stepId);
-    setErrorMessage(null);
-    setSteps(nextSteps);
-    setProgress(nextProgress);
-
-    try {
-      const response = await fetch("/api/extension/toggle-task", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          taskId: stepId,
-          completed: nextCompleted,
-        }),
-      });
-
-      const payload = (await response.json()) as ToggleTaskResponse;
-
-      if (!response.ok || !payload.success || !payload.task || !payload.progress) {
-        throw new Error(payload.error ?? "Unable to update this step right now.");
-      }
-
-      const syncedSteps = sortSteps(nextSteps.map((step) => (step.id === payload.task?.id ? payload.task : step)));
-      setSteps(syncedSteps);
-      setProgress(isWorkAhead ? calculateProgress(syncedSteps) : payload.progress);
-      onTaskSynced();
-    } catch {
-      setSteps(previousSteps);
-      setProgress(calculateProgress(previousSteps));
-      setErrorMessage("We couldn't save that step right now. Try again in a moment.");
-    } finally {
-      setPendingTaskId(null);
-    }
+    resetTimer("work");
+    setStatusMessage("Back to a focus block.");
   }
 
   return (
@@ -461,36 +491,71 @@ function FocusAssignmentCard({
         ))}
       </div>
 
-      <div className="space-y-3 rounded-[24px] border border-[#e8eef7] bg-white px-5 py-5">
-        <div className="flex items-center justify-between text-sm font-medium text-[#6f7f99]">
-          <span>{`${progress.completedSteps}/${progress.totalSteps} completed`}</span>
-          <span>{Math.round((progress.completedSteps / (progress.totalSteps || 1)) * 100)}%</span>
+      <div className="space-y-5 rounded-[24px] border border-[#e8eef7] bg-white px-5 py-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[#8ea0ba]">{getPhaseLabel(phase)}</p>
+            <p className="mt-2 text-sm text-[#6f7f99]">{getPhasePrompt(phase)}</p>
+          </div>
+          <span className="rounded-full border border-[#dfe7f5] bg-[#f8fbff] px-3 py-1.5 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[#2d6cdf]">
+            {phase === "work" ? `${WORK_MINUTES}/${SHORT_BREAK_MINUTES}` : phase === "short_break" ? `${SHORT_BREAK_MINUTES} min` : `${LONG_BREAK_MINUTES} min`}
+          </span>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-[#dfe7fb]">
-          <div className="h-full rounded-full bg-[linear-gradient(135deg,#2ec5a0,#2d6cdf)] transition-[width] duration-300" style={{ width: `${Math.round((progress.completedSteps / (progress.totalSteps || 1)) * 100)}%` }} />
+
+        <div className="rounded-[24px] bg-[linear-gradient(145deg,_#f8fbff_0%,_#ffffff_100%)] px-5 py-6 text-center shadow-[0_18px_40px_-34px_rgba(15,23,42,0.12)]">
+          <p className="text-[3.2rem] font-semibold tracking-[-0.06em] text-[#15295c] sm:text-[4.2rem]">{formatTimer(secondsRemaining)}</p>
+          <p className="mt-3 text-sm text-[#6f7f99]">{phase === "work" ? "Stay on this assignment until the block ends." : "Reset, then come back when you are ready."}</p>
         </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-[20px] border border-[#e8eef7] bg-[#fbfcff] px-4 py-4">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[#8ea0ba]">Focus blocks</p>
+            <p className="mt-2 text-[1.75rem] font-semibold tracking-[-0.04em] text-[#15295c]">{completedFocusBlocks}</p>
+          </div>
+          <div className="rounded-[20px] border border-[#e8eef7] bg-[#fbfcff] px-4 py-4">
+            <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[#8ea0ba]">Suggested today</p>
+            <p className="mt-2 text-[1.75rem] font-semibold tracking-[-0.04em] text-[#15295c]">{suggestedFocusBlocks}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-sm font-medium text-[#6f7f99]">
+          <span className="rounded-full border border-[#dfe7f5] bg-[#f8fbff] px-4 py-2">{`${WORK_MINUTES} min work`}</span>
+          <span className="rounded-full border border-[#dfe7f5] bg-[#f8fbff] px-4 py-2">{`${SHORT_BREAK_MINUTES} min short break`}</span>
+          <span className="rounded-full border border-[#dfe7f5] bg-[#f8fbff] px-4 py-2">{`${LONG_BREAK_MINUTES} min long break after ${WORK_SESSIONS_UNTIL_LONG_BREAK}`}</span>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            className="dueable-button-primary inline-flex min-h-12 items-center justify-center px-5 py-3 text-sm font-semibold text-white"
+            onClick={() => {
+              setIsTimerRunning((currentIsTimerRunning) => !currentIsTimerRunning);
+              setStatusMessage(null);
+            }}
+          >
+            {isTimerRunning ? "Pause session" : phase === "work" ? "Start focus session" : "Start break"}
+          </button>
+          <button
+            type="button"
+            className="inline-flex min-h-12 items-center justify-center rounded-[14px] border border-[#dfe7f5] bg-white px-5 py-3 text-sm font-semibold text-[#2d6cdf]"
+            onClick={() => resetTimer(phase)}
+          >
+            Reset
+          </button>
+          <button type="button" className="inline-flex min-h-12 items-center justify-center px-2 py-3 text-sm font-semibold text-[#5f7f73]" onClick={skipToNextPhase}>
+            {phase === "work" ? "Skip to break" : "Back to work"}
+          </button>
+        </div>
+
+        {statusMessage ? <p className="text-sm text-[#5f7f73]">{statusMessage}</p> : null}
       </div>
-
-      <StepChecklist
-        steps={steps}
-        expandedStepId={expandedStepId}
-        pendingTaskId={pendingTaskId}
-        onExpand={(stepId) => {
-          setExpandedStepId((currentStepId) => (currentStepId === stepId ? null : stepId));
-        }}
-        onToggle={(stepId, completed) => {
-          void handleToggleStep(stepId, completed);
-        }}
-      />
-
-      {errorMessage ? <p className="text-sm text-[#c85c49]">{errorMessage}</p> : null}
 
       <div className="flex flex-wrap gap-3 pt-1">
         {!isWorkAhead ? (
           <button
             type="button"
             className="dueable-button-primary inline-flex min-h-12 items-center justify-center px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-55"
-            disabled={!allStepsCompleted || isCompletingAssignment}
+            disabled={isCompletingAssignment}
             onClick={onCompleteAssignment}
           >
             {isCompletingAssignment ? "Completing..." : "Mark assignment complete"}
@@ -501,7 +566,7 @@ function FocusAssignmentCard({
         </Link>
       </div>
 
-      {!allStepsCompleted && !isWorkAhead ? <p className="text-sm text-[#6f7f99]">Complete every step to mark this assignment done.</p> : null}
+      {!isWorkAhead ? <p className="text-sm text-[#6f7f99]">Use this when you are actually finished with the assignment.</p> : null}
     </section>
   );
 }
@@ -521,7 +586,7 @@ export function ExtensionDashboardShell({
   const [revealedQueue, setRevealedQueue] = useState<PlannerQueueView>(null);
   const [showClosedOverdueAssignments, setShowClosedOverdueAssignments] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(
-    activated ? "Your semester is ready. Dueable will keep reordering this plan as you finish steps." : null,
+    activated ? "Your semester is ready. Dueable will keep reordering this plan as you move through the week." : null,
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isCompletingAssignment, setIsCompletingAssignment] = useState(false);
@@ -821,9 +886,6 @@ Welcome          </h1>
             onOpenAssignment={() => openAssignment(displayedAssignment.assignmentUrl)}
             onCompleteAssignment={() => {
               void handleMarkAssignmentComplete();
-            }}
-            onTaskSynced={() => {
-              void refreshOverview({ silently: true });
             }}
             isCompletingAssignment={isCompletingAssignment}
           />

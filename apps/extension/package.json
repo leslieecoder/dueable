@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "package:store": "npm run build && rm -f dueable-extension-production.zip && cd dist && zip -r ../dueable-extension-production.zip .",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc -b"

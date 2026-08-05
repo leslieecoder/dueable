@@ -724,6 +724,133 @@
   text-align: center;
 }
 
+.pomodoro-shell {
+  display: grid;
+  gap: 12px;
+}
+
+.pomodoro-phase-row,
+.pomodoro-actions-row,
+.pomodoro-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pomodoro-phase-row {
+  justify-content: space-between;
+}
+
+.pomodoro-phase-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: #eaf3ff;
+  color: #4167b8;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pomodoro-timer-card,
+.pomodoro-stat-card {
+  border: 1px solid #e4ebf8;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.pomodoro-timer-card {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  padding: 16px 14px;
+}
+
+.pomodoro-timer-display,
+.pomodoro-timer-copy,
+.pomodoro-stat-label,
+.pomodoro-status-copy {
+  margin: 0;
+}
+
+.pomodoro-timer-display {
+  color: #253042;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.pomodoro-timer-copy,
+.pomodoro-status-copy {
+  color: #6f7d94;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.pomodoro-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pomodoro-stat-card {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+.pomodoro-stat-card strong {
+  color: #253042;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.pomodoro-stat-label {
+  color: #7b89a1;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pomodoro-preset-row {
+  flex-wrap: wrap;
+}
+
+.pomodoro-actions-row {
+  flex-wrap: wrap;
+}
+
+.pomodoro-action-button,
+.pomodoro-secondary-button,
+.pomodoro-text-button {
+  min-height: 40px;
+  border-radius: 12px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pomodoro-action-button {
+  flex: 1 1 180px;
+  background: linear-gradient(135deg, #2ec5a0, #1fb78f);
+  color: #fff;
+}
+
+.pomodoro-secondary-button {
+  flex: 0 0 auto;
+  background: #eef3ff;
+  color: #4167b8;
+}
+
+.pomodoro-text-button {
+  flex: 0 0 auto;
+  background: transparent;
+  color: #4167b8;
+}
+
 .inline-complete-card {
   display: grid;
   gap: 10px;

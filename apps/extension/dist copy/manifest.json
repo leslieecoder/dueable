@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Dueable",
+  "description": "Canvas import tools for the Dueable planner.",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "Dueable"
+  },
+  "icons": {
+    "16": "assets/logo.png",
+    "32": "assets/logo.png",
+    "48": "assets/logo.png",
+    "128": "assets/logo.png"
+  },
+  "permissions": ["activeTab", "storage", "tabs", "scripting", "sidePanel"],
+  "side_panel": {
+    "default_path": "index.html"
+  },
+  "host_permissions": ["*://*/courses/*", "*://*/assignments/*", "*://*.instructure.com/*", "http://localhost:3000/*", "https://localhost:3000/*", "https://dueable-web.vercel.app/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*/courses/*", "*://*/assignments/*", "*://*.instructure.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
