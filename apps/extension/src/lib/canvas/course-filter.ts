@@ -69,12 +69,7 @@ export function filterCurrentSemesterCourses(courses: CanvasCourse[]): FilteredC
     const completed = isCompletedCourse(course, now);
     const courseHasDates = hasCourseDates(course);
 
-    if (
-      !completed &&
-      (withinDates ||
-        (activeEnrollment && !courseHasDates) ||
-        (!activeEnrollment && !courseHasDates))
-    ) {
+    if (!completed && activeEnrollment && (withinDates || !courseHasDates)) {
       currentCourses.push(course);
       continue;
     }
@@ -83,7 +78,9 @@ export function filterCurrentSemesterCourses(courses: CanvasCourse[]): FilteredC
   }
 
   if (currentCourses.length === 0) {
-    const fallbackCourses = otherCourses.filter((course) => !isCompletedCourse(course, now));
+    const fallbackCourses = otherCourses.filter(
+      (course) => hasActiveEnrollment(course) && !isCompletedCourse(course, now),
+    );
 
     if (fallbackCourses.length > 0) {
       console.log(`[Dueable][Courses] Falling back to ${fallbackCourses.length} non-completed available courses.`);

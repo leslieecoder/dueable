@@ -38,13 +38,12 @@ export function isLikelyCanvasUrl(tabUrl: string) {
   }
 
   const hostname = parsed.hostname.toLowerCase();
-  const pathname = parsed.pathname.toLowerCase();
 
   if (hostname.includes("canvas") || hostname.endsWith(".instructure.com")) {
     return true;
   }
 
-  return /\/(courses|assignments|calendar|dashboard|grades|groups|profile)(\/|$)/.test(pathname);
+  return false;
 }
 
 export function getCanvasBaseUrl(tabUrl: string) {

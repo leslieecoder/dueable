@@ -4,7 +4,7 @@ import { AllAssignmentsCompleted } from "./components/AllAssignmentsCompleted";
 import { AssignmentCompleted } from "./components/AssignmentCompleted";
 import { getCanvasBaseUrl, getCanvasCourses, isLikelyCanvasUrl, type CanvasCourse } from "./lib/canvas/api";
 import { filterCurrentSemesterCourses } from "./lib/canvas/course-filter";
-import { getDueableUrl } from "./lib/dueable-app";
+import { EXTENSION_AUTH_COMPLETE_PATH, EXTENSION_AUTH_HANDOFF_STORAGE_KEY, getDueableUrl } from "./lib/dueable-app";
 import { importSemester, type CanvasSemesterImportProgress } from "./lib/canvas/semester-importer";
 import { ExtensionMessage } from "./lib/messages";
 import { AssignmentSteps } from "./components/AssignmentSteps";
@@ -188,23 +188,25 @@ function getLoadErrorDisplay(detail?: string): ErrorDisplayState {
 async function getActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
 
-  if (tab?.id && tab.url) {
+  if (tab?.id && tab.url && typeof tab.windowId === "number") {
     return {
       id: tab.id,
       url: tab.url,
+      windowId: tab.windowId,
     };
   }
 
   const fallbackTabs = await chrome.tabs.query({ active: true });
   const fallbackTab = fallbackTabs.find((candidate) => candidate.id && candidate.url);
 
-  if (!fallbackTab?.id || !fallbackTab.url) {
+  if (!fallbackTab?.id || !fallbackTab.url || typeof fallbackTab.windowId !== "number") {
     throw new Error("No active browser tab is available.");
   }
 
   return {
     id: fallbackTab.id,
     url: fallbackTab.url,
+    windowId: fallbackTab.windowId,
   };
 }
 
@@ -273,18 +275,6 @@ function formatDueDate(value: string) {
   }).format(parsed);
 }
 
-function formatEstimatedHours(hours: number) {
-  if (hours <= 1) {
-    return "~1 hour";
-  }
-
-  if (Number.isInteger(hours)) {
-    return `~${hours} hours`;
-  }
-
-  return `~${hours.toFixed(1)} hours`;
-}
-
 function formatPoints(pointsPossible: number | null) {
   if (!Number.isFinite(pointsPossible) || pointsPossible === null) {
     return null;
@@ -293,8 +283,20 @@ function formatPoints(pointsPossible: number | null) {
   return `${Number.isInteger(pointsPossible) ? pointsPossible.toFixed(0) : pointsPossible.toFixed(1)} pts`;
 }
 
+function getWelcomeName(name: string | undefined) {
+  if (!name) {
+    return "Student";
+  }
+
+  const trimmedName = name.trim();
+
+  return trimmedName.length > 0 ? trimmedName : "Student";
+}
+
 function App() {
   const popupShellRef = useRef<HTMLElement | null>(null);
+  const selectedAssignmentIdRef = useRef<string | null>(null);
+  const revealedQueueRef = useRef<PlannerQueueView>(null);
   const [viewState, setViewState] = useState<PopupViewState>("loading");
   const [overview, setOverview] = useState<ExtensionOverviewResponse | null>(null);
   const [currentCanvasCourses, setCurrentCanvasCourses] = useState<CanvasCourse[]>([]);
@@ -308,18 +310,42 @@ function App() {
   const [importProgress, setImportProgress] = useState<ImportProgressState | null>(null);
   const [errorDisplay, setErrorDisplay] = useState<ErrorDisplayState>(getDefaultCanvasPrompt);
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
+  const [expandedAssignmentId, setExpandedAssignmentId] = useState<string | null>(null);
   const [showClosedOverdueAssignments, setShowClosedOverdueAssignments] = useState(false);
   const [revealedQueue, setRevealedQueue] = useState<PlannerQueueView>(null);
-  const handleOpenLogin = useCallback(async (options?: { markFirstVisit?: boolean }) => {
+
+  useEffect(() => {
+    selectedAssignmentIdRef.current = selectedAssignmentId;
+  }, [selectedAssignmentId]);
+
+  useEffect(() => {
+    revealedQueueRef.current = revealedQueue;
+  }, [revealedQueue]);
+
+  const beginAuthHandoff = useCallback(async (path: string, options?: { markFirstVisit?: boolean }) => {
+    const activeTab = await getActiveTab();
+
     if (options?.markFirstVisit) {
       await setStoredFlag(FIRST_LOGIN_REDIRECT_KEY, true);
     }
 
-    await chrome.tabs.create({ url: getDueableUrl("/login?next=%2Fdashboard") });
+    const authTab = await chrome.tabs.create({ url: getDueableUrl(path) });
+
+    await chrome.storage.local.set({
+      [EXTENSION_AUTH_HANDOFF_STORAGE_KEY]: {
+        returnTabId: activeTab.id,
+        returnWindowId: activeTab.windowId,
+        authTabId: authTab.id,
+      },
+    });
   }, []);
 
+  const handleOpenLogin = useCallback(async (options?: { markFirstVisit?: boolean }) => {
+    await beginAuthHandoff(`/login?next=${encodeURIComponent(EXTENSION_AUTH_COMPLETE_PATH)}`, options);
+  }, [beginAuthHandoff]);
+
   async function handleOpenSignup() {
-    await chrome.tabs.create({ url: getDueableUrl("/signup") });
+    await beginAuthHandoff(`/signup?next=${encodeURIComponent(EXTENSION_AUTH_COMPLETE_PATH)}`);
   }
 
   const loadExtensionState = useCallback(async (options?: { silently?: boolean }) => {
@@ -334,6 +360,7 @@ function App() {
         setImportSummary(null);
         setImportProgress(null);
         setErrorDisplay(getDefaultCanvasPrompt());
+        setExpandedAssignmentId(null);
         setRevealedQueue(null);
       }
 
@@ -351,6 +378,7 @@ function App() {
         setOverview(null);
         setCurrentCanvasCourses([]);
         setSelectedAssignmentId(null);
+        setExpandedAssignmentId(null);
         setRevealedQueue(null);
         setViewState("unauthenticated");
 
@@ -372,18 +400,55 @@ function App() {
       setShowClosedOverdueAssignments(false);
 
       if (!silently) {
-        setSelectedAssignmentId(null);
+        setSelectedAssignmentId((currentAssignmentId) => {
+          if (!currentAssignmentId) {
+            return null;
+          }
 
-        if (payload.focus) {
-          setRevealedQueue(null);
-        }
+          const activeQueueAssignmentIds = new Set(getQueueAssignmentIds(payload, revealedQueueRef.current));
+
+          return activeQueueAssignmentIds.has(currentAssignmentId) ? currentAssignmentId : null;
+        });
+        setExpandedAssignmentId((currentAssignmentId) => {
+          if (!currentAssignmentId) {
+            return null;
+          }
+
+          const activeQueueAssignmentIds = new Set(getQueueAssignmentIds(payload, revealedQueueRef.current));
+
+          return activeQueueAssignmentIds.has(currentAssignmentId) ? currentAssignmentId : null;
+        });
+
+        setRevealedQueue((currentQueue) => {
+          if (currentQueue === "work_ahead") {
+            return payload.workAhead.length > 0 ? currentQueue : payload.focus ? null : currentQueue;
+          }
+
+          if (currentQueue === "overdue") {
+            return payload.overdue.length > 0 || payload.closedOverdue.length > 0 ? currentQueue : payload.focus ? null : currentQueue;
+          }
+
+          if (payload.focus) {
+            return null;
+          }
+
+          if (payload.workAhead.length > 0) {
+            return "work_ahead";
+          }
+
+          if (payload.overdue.length > 0 || payload.closedOverdue.length > 0) {
+            return "overdue";
+          }
+
+          return currentQueue;
+        });
       } else {
         setRevealedQueue((currentQueue) => {
           if (currentQueue === "work_ahead" && payload.workAhead.length === 0) {
             return payload.focus ? null : currentQueue;
           }
 
-          if (currentQueue === "overdue" && payload.overdue.length === 0) {
+          if (currentQueue === "overdue" && payload.overdue.length === 0 && payload.closedOverdue.length === 0) {
             return payload.focus ? null : currentQueue;
           }
 
@@ -395,7 +460,16 @@ function App() {
             return null;
           }
 
-          const activeQueueAssignmentIds = new Set(getQueueAssignmentIds(payload, revealedQueue));
+          const activeQueueAssignmentIds = new Set(getQueueAssignmentIds(payload, revealedQueueRef.current));
+
+          return activeQueueAssignmentIds.has(currentAssignmentId) ? currentAssignmentId : null;
+        });
+        setExpandedAssignmentId((currentAssignmentId) => {
+          if (!currentAssignmentId) {
+            return null;
+          }
+
+          const activeQueueAssignmentIds = new Set(getQueueAssignmentIds(payload, revealedQueueRef.current));
 
           return activeQueueAssignmentIds.has(currentAssignmentId) ? currentAssignmentId : null;
         });
@@ -436,7 +510,7 @@ function App() {
       );
       setViewState("error");
     }
-  }, [handleOpenLogin, revealedQueue]);
+  }, [handleOpenLogin]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -589,6 +663,7 @@ function App() {
 
       setOverview(payload.overview);
       setSelectedAssignmentId(null);
+      setExpandedAssignmentId(null);
       setFeedbackMessage("Assignment completed. Dueable moved to the next priority.");
 
       if (payload.overview.focus) {
@@ -625,6 +700,7 @@ function App() {
       setOverview(null);
       setCurrentCanvasCourses([]);
       setSelectedAssignmentId(null);
+      setExpandedAssignmentId(null);
       setRevealedQueue(null);
       setViewState("unauthenticated");
       setFeedbackMessage("You have been logged out of Dueable.");
@@ -638,6 +714,7 @@ function App() {
 
   function handleContinueAfterCompletion() {
     setCompletionState(null);
+    setExpandedAssignmentId(null);
     setViewState("ready");
   }
 
@@ -667,22 +744,25 @@ function App() {
 
     setRevealedQueue("work_ahead");
     setSelectedAssignmentId(null);
+    setExpandedAssignmentId(null);
     setShowClosedOverdueAssignments(false);
   }
 
   function handleRevealOverdue() {
-    if ((overview?.overdue.length ?? 0) === 0) {
+    if ((overview?.overdue.length ?? 0) + (overview?.closedOverdue.length ?? 0) === 0) {
       void handleOpenDashboard();
       return;
     }
 
     setRevealedQueue("overdue");
     setSelectedAssignmentId(null);
+    setExpandedAssignmentId(null);
     setShowClosedOverdueAssignments(false);
   }
 
   function handleSelectQueue(queue: PlannerQueueTab) {
     setSelectedAssignmentId(null);
+    setExpandedAssignmentId(null);
     setShowClosedOverdueAssignments(false);
 
     if (queue === "this_week") {
@@ -726,7 +806,11 @@ function App() {
     }
 
     if (revealedQueue === "overdue") {
-      return overview?.overdue ?? [];
+      if ((overview?.overdue.length ?? 0) > 0) {
+        return overview?.overdue ?? [];
+      }
+
+      return overview?.closedOverdue ?? [];
     }
 
     if (weeklyAssignments.length > 0) {
@@ -743,32 +827,15 @@ function App() {
 
     return visibleAssignments.find((assignment) => assignment.id === selectedAssignmentId) ?? visibleAssignments[0];
   }, [selectedAssignmentId, visibleAssignments]);
-  const upcomingAssignments = useMemo(
-    () => visibleAssignments.filter((assignment) => assignment.id !== displayedAssignment?.id),
-    [displayedAssignment?.id, visibleAssignments],
-  );
   const hasWeeklyAssignments = weeklyAssignments.length > 0;
-  const focusMetadata = useMemo(() => {
-    if (!displayedAssignment) {
-      return [] as string[];
-    }
-
-    return [
-      formatPoints(displayedAssignment.pointsPossible),
-      `${displayedAssignment.dateLabel} ${formatDueDate(displayedAssignment.dueDate)}`,
-      displayedAssignment.difficulty,
-      formatEstimatedHours(displayedAssignment.estimatedHours),
-    ].filter((value): value is string => Boolean(value));
-  }, [displayedAssignment]);
-
-  const formattedUpcomingAssignments = useMemo(
+  const formattedVisibleAssignments = useMemo(
     () =>
-      upcomingAssignments.map((assignment) => ({
+      visibleAssignments.map((assignment) => ({
         ...assignment,
         formattedDueText: `${assignment.dateLabel} ${formatDueDate(assignment.dueDate)}`,
         formattedPoints: formatPoints(assignment.pointsPossible),
       })),
-    [upcomingAssignments],
+    [visibleAssignments],
   );
   const closedOverdueAssignments = useMemo<ClosedOverdueAssignmentSummary[]>(
     () =>
@@ -786,20 +853,20 @@ function App() {
   const availableQueueCounts = useMemo(
     () => ({
       thisWeek: weeklyAssignments.length,
-      overdue: overview?.overdue.length ?? 0,
+      overdue: (overview?.overdue.length ?? 0) + (overview?.closedOverdue.length ?? 0),
       workAhead: overview?.workAhead.length ?? 0,
     }),
-    [overview?.overdue.length, overview?.workAhead.length, weeklyAssignments.length],
+    [overview?.closedOverdue.length, overview?.overdue.length, overview?.workAhead.length, weeklyAssignments.length],
   );
   const activeQueueTab: PlannerQueueTab = revealedQueue ?? "this_week";
   const showQueueTabs =
     viewState === "ready" &&
     (availableQueueCounts.thisWeek > 0 || availableQueueCounts.overdue > 0 || availableQueueCounts.workAhead > 0);
-  const upcomingSectionTitle =
-    activeQueueTab === "overdue" ? "Overdue" : activeQueueTab === "work_ahead" ? "Work Ahead" : "Current Week";
+  const welcomeName = getWelcomeName(overview?.userName);
   const hasClosedOverdueAssignments = closedOverdueAssignments.length > 0;
   const showClosedOverdueToggle = viewState === "ready" && activeQueueTab === "overdue" && hasClosedOverdueAssignments;
   const showOverdueEmptyState = viewState === "ready" && activeQueueTab === "overdue" && !displayedAssignment;
+  const showWorkAheadEmptyState = viewState === "ready" && activeQueueTab === "work_ahead" && !displayedAssignment;
 
   return (
     <main ref={popupShellRef} className="popup-shell">
@@ -874,38 +941,45 @@ function App() {
 
       {showQueueTabs ? (
         <section className="popup-panel popup-panel-compact">
+          <div className="queue-tabs-header">
+            <p className="queue-tabs-title">Welcome {welcomeName}</p>
+            <p className="queue-tabs-subtitle">Let&apos;s get things done!</p>
+          </div>
           <div className="queue-tabs" role="tablist" aria-label="Assignment queues">
             <button
               type="button"
               role="tab"
               aria-selected={activeQueueTab === "this_week"}
-              className={`queue-tab-button${activeQueueTab === "this_week" ? " queue-tab-button-active" : ""}`}
+              className={`queue-tab-button queue-tab-button-this-week${activeQueueTab === "this_week" ? " queue-tab-button-active" : ""}`}
               onClick={() => handleSelectQueue("this_week")}
             >
-              <span>This Week</span>
+
               <span className="queue-tab-count">{availableQueueCounts.thisWeek}</span>
+                <span>This Week</span>
             </button>
             <button
               type="button"
               role="tab"
               aria-selected={activeQueueTab === "overdue"}
-              className={`queue-tab-button${activeQueueTab === "overdue" ? " queue-tab-button-active" : ""}`}
+              className={`queue-tab-button queue-tab-button-overdue${activeQueueTab === "overdue" ? " queue-tab-button-active" : ""}`}
               onClick={() => handleSelectQueue("overdue")}
               disabled={availableQueueCounts.overdue === 0}
             >
-              <span>Overdue</span>
+         
               <span className="queue-tab-count">{availableQueueCounts.overdue}</span>
+                   <span>Overdue</span>
             </button>
             <button
               type="button"
               role="tab"
               aria-selected={activeQueueTab === "work_ahead"}
-              className={`queue-tab-button${activeQueueTab === "work_ahead" ? " queue-tab-button-active" : ""}`}
+              className={`queue-tab-button queue-tab-button-work-ahead${activeQueueTab === "work_ahead" ? " queue-tab-button-active" : ""}`}
               onClick={() => handleSelectQueue("work_ahead")}
               disabled={availableQueueCounts.workAhead === 0}
             >
-              <span>Work Ahead</span>
+             
               <span className="queue-tab-count">{availableQueueCounts.workAhead}</span>
+               <span>Work Ahead</span>
             </button>
           </div>
         </section>
@@ -913,51 +987,49 @@ function App() {
 
       {viewState === "ready" && displayedAssignment ? (
         <>
-          <AssignmentSteps
-            focus={{
-              assignment: {
-                id: displayedAssignment.id,
-                title: displayedAssignment.title,
-                course: displayedAssignment.courseTitle,
-                courseColor: displayedAssignment.courseColor,
-                dueDate: displayedAssignment.dueDate,
-                dateLabel: displayedAssignment.dateLabel,
-                assignmentUrl: displayedAssignment.assignmentUrl,
-                points: displayedAssignment.pointsPossible,
-              },
-              steps: displayedAssignment.steps,
-              progress: displayedAssignment.progress,
-              estimatedHours: displayedAssignment.estimatedHours,
-              difficulty: displayedAssignment.difficulty,
-              priorityLabel: displayedAssignment.priorityLabel,
-              planProvider: displayedAssignment.planProvider,
-              badgeLabel: displayedAssignment.badgeLabel,
+          <UpcomingAssignments
+            assignments={formattedVisibleAssignments}
+            selectedAssignmentId={displayedAssignment.id}
+            expandedAssignmentId={expandedAssignmentId}
+            onSelect={(assignmentId) => {
+              setSelectedAssignmentId(assignmentId);
+              setExpandedAssignmentId((currentAssignmentId) => (currentAssignmentId === assignmentId ? currentAssignmentId : null));
             }}
-            metadata={focusMetadata}
-            steps={displayedAssignment.steps}
-            initialProgress={displayedAssignment.progress}
-            onOpenAssignment={() => void handleOpenCanvasAssignment(displayedAssignment.assignmentUrl)}
-            onCompleteAssignment={() => void handleMarkAssignmentComplete(displayedAssignment.id, displayedAssignment.title)}
-            isCompletingAssignment={isCompletingAssignment}
+            onOpenAssignment={(assignmentUrl) => {
+              void handleOpenCanvasAssignment(assignmentUrl);
+            }}
+            onStartAssignment={(assignmentId) => {
+              setSelectedAssignmentId(assignmentId);
+              setExpandedAssignmentId(assignmentId);
+            }}
+            renderExpandedContent={(assignment) => (
+              <AssignmentSteps
+                focus={{
+                  assignment: {
+                    id: assignment.id,
+                    title: assignment.title,
+                    course: assignment.courseTitle,
+                    courseColor: assignment.courseColor,
+                    dueDate: assignment.dueDate,
+                    dateLabel: assignment.dateLabel,
+                    assignmentUrl: assignment.assignmentUrl,
+                    points: assignment.pointsPossible,
+                  },
+                  steps: assignment.steps,
+                  progress: assignment.progress,
+                  estimatedHours: assignment.estimatedHours,
+                  difficulty: assignment.difficulty,
+                  priorityLabel: assignment.priorityLabel,
+                  planProvider: assignment.planProvider,
+                  badgeLabel: assignment.badgeLabel,
+                }}
+                steps={assignment.steps}
+                initialProgress={assignment.progress}
+                onCompleteAssignment={() => void handleMarkAssignmentComplete(assignment.id, assignment.title)}
+                isCompletingAssignment={isCompletingAssignment}
+              />
+            )}
           />
-
-          <div className="panel-header-row">
-            <p className="section-label">{upcomingSectionTitle}</p>
-          </div>
-
-          {formattedUpcomingAssignments.length > 0 ? (
-            <UpcomingAssignments
-              assignments={formattedUpcomingAssignments}
-              selectedAssignmentId={displayedAssignment.id}
-              onSelect={(assignmentId) => {
-                setSelectedAssignmentId(assignmentId);
-                scrollToTopOfPanel();
-              }}
-              onOpenAssignment={(assignmentUrl) => {
-                void handleOpenCanvasAssignment(assignmentUrl);
-              }}
-            />
-          ) : null}
         </>
       ) : null}
 
@@ -966,6 +1038,15 @@ function App() {
           <div className="empty-card canvas-empty-card">
             <p className="panel-title">No overdue assignments are still available</p>
             <p className="panel-copy">Anything past due without an active Canvas availability window is hidden from this queue.</p>
+          </div>
+        </section>
+      ) : null}
+
+      {showWorkAheadEmptyState ? (
+        <section className="popup-panel">
+          <div className="empty-card canvas-empty-card">
+            <p className="panel-title">No work-ahead assignments are ready right now</p>
+            <p className="panel-copy">Dueable only moves larger future assignments into this queue when they are worth starting early.</p>
           </div>
         </section>
       ) : null}
@@ -1006,8 +1087,6 @@ function App() {
         <AllAssignmentsCompleted onSeeWorkAhead={handleRevealWorkAhead} onReviewOverdue={handleRevealOverdue} />
       ) : null}
 
-      {feedbackMessage && (viewState === "ready" || viewState === "assignment-completed") ? <p className="popup-feedback-banner">{feedbackMessage}</p> : null}
-
       {viewState === "ready" && !showCaughtUpState ? (
         <div className="popup-footer-actions">
           <button type="button" className="text-button" onClick={() => void handleLogout()} disabled={isLoggingOut}>
@@ -1015,8 +1094,6 @@ function App() {
           </button>
         </div>
       ) : null}
-
-      {feedbackMessage && viewState === "unauthenticated" ? <p className="popup-feedback-banner">{feedbackMessage}</p> : null}
     </main>
   );
 }

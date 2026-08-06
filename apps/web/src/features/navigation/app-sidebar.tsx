@@ -5,11 +5,10 @@ import type { AuthenticatedUser } from "@/lib/auth/user";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import { FileText, Home, MonitorSmartphone } from "lucide-react";
+import { Home, MonitorSmartphone } from "lucide-react";
 
 const navigationItems = [
   { href: "/dashboard", label: "Home", icon: Home },
-  { href: "/assignments", label: "Assignments", icon: FileText },
   { href: "/extension", label: "Extension", icon: MonitorSmartphone },
 ];
 

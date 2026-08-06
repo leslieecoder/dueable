@@ -66,7 +66,7 @@ export interface AssignmentDetailData {
   checklist: AssignmentChecklistItem[];
 }
 
-interface AssignmentBundle {
+export interface AssignmentBundle {
   assignment: AssignmentRow;
   course: CourseRow;
   tasks: TaskRow[];
@@ -179,7 +179,7 @@ function mapAssignmentRowToDomain(assignment: AssignmentRow): Assignment {
   };
 }
 
-async function fetchAssignmentBundles() {
+export async function getAssignmentBundles() {
   const supabase = await createSupabaseServerClient();
   const assignmentResult = await supabase
     .from("assignments")
@@ -266,7 +266,7 @@ async function fetchAssignmentBundles() {
 }
 
 export async function getDashboardOverview(userName: string): Promise<DashboardOverview> {
-  const bundles = await fetchAssignmentBundles();
+  const bundles = await getAssignmentBundles();
   const today = startOfToday();
 
   const todaysTasks: DashboardTaskItem[] = bundles
@@ -346,14 +346,7 @@ export async function getDashboardOverview(userName: string): Promise<DashboardO
   };
 }
 
-export async function getAssignmentDetail(assignmentId: string): Promise<AssignmentDetailData | null> {
-  const bundles = await fetchAssignmentBundles();
-  const bundle = bundles.find((entry) => entry.assignment.id === assignmentId);
-
-  if (!bundle) {
-    return null;
-  }
-
+export function mapAssignmentBundleToDetail(bundle: AssignmentBundle): AssignmentDetailData {
   return {
     id: bundle.assignment.id,
     title: bundle.assignment.title,
@@ -385,10 +378,15 @@ export async function getAssignmentDetail(assignmentId: string): Promise<Assignm
   };
 }
 
-export async function getAssignmentList(): Promise<AssignmentListItem[]> {
-  const bundles = await fetchAssignmentBundles();
+export async function getAssignmentDetail(assignmentId: string): Promise<AssignmentDetailData | null> {
+  const bundles = await getAssignmentBundles();
+  const bundle = bundles.find((entry) => entry.assignment.id === assignmentId);
 
-  return bundles.map((bundle) => ({
+  return bundle ? mapAssignmentBundleToDetail(bundle) : null;
+}
+
+export function mapAssignmentBundleToListItem(bundle: AssignmentBundle): AssignmentListItem {
+  return {
     id: bundle.assignment.id,
     title: bundle.assignment.title,
     courseTitle: bundle.course.title,
@@ -396,13 +394,23 @@ export async function getAssignmentList(): Promise<AssignmentListItem[]> {
     availableUntil: bundle.assignment.available_until,
     estimatedHours: bundle.assignment.estimated_hours,
     pointsPossible: bundle.assignment.points_possible,
-  }));
+  };
+}
+
+export async function getAssignmentList(): Promise<AssignmentListItem[]> {
+  const bundles = await getAssignmentBundles();
+
+  return bundles.map(mapAssignmentBundleToListItem);
+}
+
+export function mapAssignmentBundleToDomainAssignment(bundle: AssignmentBundle): Assignment {
+  return mapAssignmentRowToDomain(bundle.assignment);
 }
 
 export async function getAssignments(): Promise<Assignment[]> {
-  const bundles = await fetchAssignmentBundles();
+  const bundles = await getAssignmentBundles();
 
-  return bundles.map((bundle) => mapAssignmentRowToDomain(bundle.assignment));
+  return bundles.map(mapAssignmentBundleToDomainAssignment);
 }
 
 export function getPriorityLabel(dueDate: string) {

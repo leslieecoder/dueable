@@ -96,6 +96,8 @@ interface StoredTimerState {
   endsAt: number | null;
 }
 
+type StoredTimerStateMap = Record<string, StoredTimerState>;
+
 function getPhaseDurationSeconds(phase: TimerPhase) {
   if (phase === "work") {
     return WORK_MINUTES * 60;
@@ -346,13 +348,17 @@ function FocusAssignmentCard({
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [completedFocusBlocks, setCompletedFocusBlocks] = useState(0);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [hasLoadedStoredState, setHasLoadedStoredState] = useState(false);
   const courseDisplay = useMemo(() => splitCourseDisplayLabel(assignment.courseTitle), [assignment.courseTitle]);
   const courseCodePillStyle = useMemo(() => buildCourseCodePillStyle(assignment.courseColor), [assignment.courseColor]);
   const suggestedFocusBlocks = useMemo(() => Math.max(1, Math.ceil(assignment.estimatedHours * 3)), [assignment.estimatedHours]);
 
   useEffect(() => {
+    setHasLoadedStoredState(false);
+
     const storedValue = window.localStorage.getItem(TIMER_STORAGE_KEY);
-    const nextState = getStoredStateForAssignment(storedValue ? (JSON.parse(storedValue) as StoredTimerState) : null, assignment.id);
+    const storedStates = storedValue ? (JSON.parse(storedValue) as StoredTimerStateMap) : {};
+    const nextState = getStoredStateForAssignment(storedStates[assignment.id] ?? null, assignment.id);
 
     if (!nextState) {
       setPhase("work");
@@ -360,6 +366,7 @@ function FocusAssignmentCard({
       setIsTimerRunning(false);
       setCompletedFocusBlocks(0);
       setStatusMessage(null);
+      setHasLoadedStoredState(true);
       return;
     }
 
@@ -368,21 +375,32 @@ function FocusAssignmentCard({
     setIsTimerRunning(nextState.isTimerRunning);
     setCompletedFocusBlocks(nextState.completedFocusBlocks);
     setStatusMessage(nextState.statusMessage);
+    setHasLoadedStoredState(true);
   }, [assignment.id]);
 
   useEffect(() => {
+    if (!hasLoadedStoredState) {
+      return;
+    }
+
+    const storedValue = window.localStorage.getItem(TIMER_STORAGE_KEY);
+    const storedStates = storedValue ? (JSON.parse(storedValue) as StoredTimerStateMap) : {};
+
     window.localStorage.setItem(
       TIMER_STORAGE_KEY,
       JSON.stringify({
-        assignmentId: assignment.id,
-        phase,
-        secondsRemaining,
-        isTimerRunning,
-        completedFocusBlocks,
-        endsAt: isTimerRunning ? Date.now() + secondsRemaining * 1000 : null,
-      } satisfies StoredTimerState),
+        ...storedStates,
+        [assignment.id]: {
+          assignmentId: assignment.id,
+          phase,
+          secondsRemaining,
+          isTimerRunning,
+          completedFocusBlocks,
+          endsAt: isTimerRunning ? Date.now() + secondsRemaining * 1000 : null,
+        } satisfies StoredTimerState,
+      } satisfies StoredTimerStateMap),
     );
-  }, [assignment.id, completedFocusBlocks, isTimerRunning, phase, secondsRemaining]);
+  }, [assignment.id, completedFocusBlocks, hasLoadedStoredState, isTimerRunning, phase, secondsRemaining]);
 
   useEffect(() => {
     if (!isTimerRunning) {
@@ -462,7 +480,7 @@ function FocusAssignmentCard({
   }
 
   return (
-    <section className="space-y-5 rounded-[32px] border border-[#d9e4f7] bg-[linear-gradient(180deg,_#f7faff_0%,_#ffffff_100%)] p-6 shadow-[0_32px_62px_-42px_rgba(53,88,154,0.28)] sm:p-8">
+    <section className="space-y-5 rounded-4xl border border-[#d9e4f7] bg-[linear-gradient(180deg,#f7faff_0%,#ffffff_100%)] p-6 shadow-[0_32px_62px_-42px_rgba(53,88,154,0.28)] sm:p-8">
       <div className="flex flex-wrap gap-2">
         <span className="rounded-full bg-[#ff7a1a] px-3 py-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-white">{assignment.priorityLabel}</span>
         {courseDisplay.courseCode ? (
@@ -491,7 +509,7 @@ function FocusAssignmentCard({
         ))}
       </div>
 
-      <div className="space-y-5 rounded-[24px] border border-[#e8eef7] bg-white px-5 py-5">
+      <div className="space-y-5 rounded-3xl border border-[#e8eef7] bg-white px-5 py-5">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[#8ea0ba]">{getPhaseLabel(phase)}</p>
@@ -502,7 +520,7 @@ function FocusAssignmentCard({
           </span>
         </div>
 
-        <div className="rounded-[24px] bg-[linear-gradient(145deg,_#f8fbff_0%,_#ffffff_100%)] px-5 py-6 text-center shadow-[0_18px_40px_-34px_rgba(15,23,42,0.12)]">
+        <div className="rounded-3xl bg-[linear-gradient(145deg,#f8fbff_0%,#ffffff_100%)] px-5 py-6 text-center shadow-[0_18px_40px_-34px_rgba(15,23,42,0.12)]">
           <p className="text-[3.2rem] font-semibold tracking-[-0.06em] text-[#15295c] sm:text-[4.2rem]">{formatTimer(secondsRemaining)}</p>
           <p className="mt-3 text-sm text-[#6f7f99]">{phase === "work" ? "Stay on this assignment until the block ends." : "Reset, then come back when you are ready."}</p>
         </div>
@@ -622,11 +640,39 @@ export function ExtensionDashboardShell({
       setErrorMessage(null);
 
       if (!silently) {
-        setSelectedAssignmentId(null);
+        setSelectedAssignmentId((currentAssignmentId) => {
+          if (!currentAssignmentId) {
+            return null;
+          }
 
-        if (payload.focus) {
-          setRevealedQueue(null);
-        }
+          const activeQueueAssignmentIds = new Set(getQueueAssignmentIds(payload, revealedQueueRef.current));
+
+          return activeQueueAssignmentIds.has(currentAssignmentId) ? currentAssignmentId : null;
+        });
+
+        setRevealedQueue((currentQueue) => {
+          if (currentQueue === "work_ahead") {
+            return payload.workAhead.length > 0 ? currentQueue : payload.focus ? null : currentQueue;
+          }
+
+          if (currentQueue === "overdue") {
+            return payload.overdue.length > 0 || payload.closedOverdue.length > 0 ? currentQueue : payload.focus ? null : currentQueue;
+          }
+
+          if (payload.focus) {
+            return null;
+          }
+
+          if (payload.workAhead.length > 0) {
+            return "work_ahead";
+          }
+
+          if (payload.overdue.length > 0 || payload.closedOverdue.length > 0) {
+            return "overdue";
+          }
+
+          return currentQueue;
+        });
 
         return;
       }
@@ -817,7 +863,7 @@ Welcome          </h1>
       ) : null}
 
       {completionState ? (
-        <section className="rounded-[30px] border border-[#d9e4f7] bg-[linear-gradient(180deg,_#ffffff_0%,_#f7fbff_100%)] px-6 py-7 shadow-[0_30px_60px_-40px_rgba(53,88,154,0.24)]">
+        <section className="rounded-[30px] border border-[#d9e4f7] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] px-6 py-7 shadow-[0_30px_60px_-40px_rgba(53,88,154,0.24)]">
           <div className="flex items-start gap-4">
             <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#e8fbf4] text-[#19805f]">
               <CheckCircle2 className="h-6 w-6" />
@@ -834,7 +880,7 @@ Welcome          </h1>
       ) : null}
 
       {showQueueTabs ? (
-        <section className="rounded-[24px] border border-[#e2ebf7] bg-white px-3 py-3 shadow-[0_18px_34px_-28px_rgba(15,23,42,0.12)]">
+        <section className="rounded-3xl border border-[#e2ebf7] bg-white px-3 py-3 shadow-[0_18px_34px_-28px_rgba(15,23,42,0.12)]">
           <div className="flex flex-wrap gap-2">
             {([
               { key: "this_week", label: "This Week", count: availableQueueCounts.thisWeek },
@@ -863,9 +909,9 @@ Welcome          </h1>
 
       {showCaughtUpState ? (
         <section className="grid gap-5 lg:grid-cols-2">
-          <div className="rounded-[30px] border border-[#d9e4f7] bg-[linear-gradient(180deg,_#f7faff_0%,_#ffffff_100%)] p-7 shadow-[0_30px_60px_-40px_rgba(53,88,154,0.24)]">
+          <div className="rounded-[30px] border border-[#d9e4f7] bg-[linear-gradient(180deg,#f7faff_0%,#ffffff_100%)] p-7 shadow-[0_30px_60px_-40px_rgba(53,88,154,0.24)]">
             <p className="dueable-eyebrow text-[#8d99af]">Caught up</p>
-            <h2 className="mt-4 text-[2.4rem] font-semibold tracking-[-0.05em] text-[#15295c]">You cleared this week.</h2>
+            <h2 className="mt-4 text-[2.4rem] font-semibold tracking-tighter text-[#15295c]">You cleared this week.</h2>
             <p className="mt-4 max-w-xl text-[1rem] leading-8 text-[#6f7f99]">When nothing is urgent, use the same dashboard to work ahead or review overdue work without leaving your main app.</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <button type="button" className="dueable-button-primary inline-flex min-h-12 items-center justify-center px-5 py-3 text-sm font-semibold text-white disabled:opacity-50" disabled={overview.workAhead.length === 0} onClick={() => setRevealedQueue("work_ahead")}>
@@ -906,7 +952,7 @@ Welcome          </h1>
                   const courseCodePillStyle = buildCourseCodePillStyle(assignment.courseColor);
 
                   return (
-                    <article key={assignment.id} className={`rounded-[24px] border px-4 py-4 transition ${selectedAssignmentId === assignment.id ? "border-[#cedbfd] bg-[#f6f9ff]" : "border-[#e9eef6] bg-white/82"}`}>
+                    <article key={assignment.id} className={`rounded-3xl border px-4 py-4 transition ${selectedAssignmentId === assignment.id ? "border-[#cedbfd] bg-[#f6f9ff]" : "border-[#e9eef6] bg-white/82"}`}>
                       <div className="flex flex-wrap gap-2">
                         <span className="rounded-full bg-[#ff7a1a] px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-white">{assignment.priorityLabel}</span>
                         {courseDisplay.courseCode ? (
@@ -947,7 +993,7 @@ Welcome          </h1>
                   );
                 })
               ) : (
-                <div className="rounded-[24px] border border-dashed border-[#dbe4f2] bg-[#fbfcff] px-4 py-5 text-sm leading-7 text-[#6f7f99]">
+                <div className="rounded-3xl border border-dashed border-[#dbe4f2] bg-[#fbfcff] px-4 py-5 text-sm leading-7 text-[#6f7f99]">
                   No other assignments are waiting in this queue.
                 </div>
               )}

@@ -1,75 +1,46 @@
-# React + TypeScript + Vite
+# Dueable Extension
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This Chrome side-panel extension connects Canvas to the Dueable web app.
 
-Currently, two official plugins are available:
+## Production Origin
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The extension defaults to the production Dueable web origin:
 
-## React Compiler
+`https://dueable-web.vercel.app`
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+That origin is used for:
 
-## Expanding the ESLint configuration
+- login and signup handoff
+- extension overview requests
+- semester import requests
+- assignment completion requests
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Local Development Override
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+To point the extension at a local web app during development, create an env file for Vite and override the origin:
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+VITE_DUEABLE_WEB_ORIGIN=http://localhost:3000
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+You can also use `VITE_DUEABLE_DASHBOARD_URL`, but `VITE_DUEABLE_WEB_ORIGIN` is the preferred setting.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+The root `manifest.json` keeps localhost host permissions so an unpacked local extension can talk to the local web app.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Build
 
+```bash
+npm run build --workspace @dueable/extension
 ```
+
+## Chrome Web Store Packaging
+
+```bash
+npm run package:store --workspace @dueable/extension
+```
+
+This creates `apps/extension/dueable-extension-production.zip`.
+
+`package:store` forces `VITE_DUEABLE_WEB_ORIGIN=https://dueable-web.vercel.app` so the packaged build does not inherit your local `.env.local` override.
+
+Before upload, keep `manifest.json` production-only. Do not add localhost host permissions to the store build.

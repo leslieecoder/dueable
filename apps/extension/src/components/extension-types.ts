@@ -48,6 +48,7 @@ export interface ExtensionOverviewAssignment {
 
 export interface ExtensionOverviewResponse {
   synced: boolean;
+  userName?: string;
   focus: ExtensionOverviewFocus | null;
   upcoming: ExtensionOverviewAssignment[];
   workAhead: ExtensionOverviewAssignment[];

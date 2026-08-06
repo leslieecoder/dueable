@@ -1,5 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getAssignmentDetail, getAssignmentList, getAssignments } from "@/features/assignments/data";
+import {
+  getAssignmentBundles,
+  mapAssignmentBundleToDetail,
+  mapAssignmentBundleToDomainAssignment,
+  mapAssignmentBundleToListItem,
+} from "@/features/assignments/data";
 import { getOptionalEnv } from "@/lib/env";
 
 type PlannerBucket = "overdue" | "closed_overdue" | "this_week" | "work_ahead" | "later";
@@ -177,8 +182,8 @@ function isFutureAvailability(value: string | null | undefined, now: Date) {
 }
 
 function isLargeFutureAssignment(
-  assignment: Awaited<ReturnType<typeof getAssignments>>[number],
-  assignmentDetail: NonNullable<Awaited<ReturnType<typeof getAssignmentDetail>>>,
+  assignment: ReturnType<typeof mapAssignmentBundleToDomainAssignment>,
+  assignmentDetail: ReturnType<typeof mapAssignmentBundleToDetail>,
   now: Date,
 ) {
   const dueTime = new Date(assignment.dueDate).getTime();
@@ -220,7 +225,7 @@ function applyPriorityLabels(assignments: Array<ExtensionOverviewAssignment & { 
 }
 
 function buildDisplayedSteps(
-  assignmentDetail: NonNullable<Awaited<ReturnType<typeof getAssignmentDetail>>>,
+  assignmentDetail: ReturnType<typeof mapAssignmentBundleToDetail>,
   plannerBucket: PlannerBucket,
 ) {
   const checklist = assignmentDetail.checklist.map((task) => ({
@@ -254,14 +259,11 @@ function buildDisplayedSteps(
 }
 
 export async function getExtensionOverview(): Promise<ExtensionOverviewPayload> {
-  const [assignments, assignmentList] = await Promise.all([getAssignments(), getAssignmentList()]);
+  const bundles = await getAssignmentBundles();
+  const assignments = bundles.map(mapAssignmentBundleToDomainAssignment);
+  const assignmentList = bundles.map(mapAssignmentBundleToListItem);
   const activeAssignments = assignments.filter((assignment) => assignment.status !== "completed");
-  const rankedDetails = await Promise.all(activeAssignments.map((assignment) => getAssignmentDetail(assignment.id)));
-  const detailMap = new Map(
-    rankedDetails
-      .filter((detail): detail is NonNullable<typeof detail> => detail !== null)
-      .map((detail) => [detail.id, detail]),
-  );
+  const detailMap = new Map(bundles.map((bundle) => [bundle.assignment.id, mapAssignmentBundleToDetail(bundle)]));
 
   const now = new Date();
 
