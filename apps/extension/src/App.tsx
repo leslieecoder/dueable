@@ -893,7 +893,9 @@ function App() {
       {viewState === "unauthenticated" ? (
         <section className="popup-panel">
           <div className="empty-card auth-card auth-card-centered">
-            <div className="auth-mark">✓</div>
+            <div className="auth-mark auth-mark-logo-shell">
+              <img src="./assets/logo.png" alt="" className="auth-mark-logo" aria-hidden="true" />
+            </div>
             <p className="panel-title">Connect dueable</p>
             <p className="panel-copy">See what assignment matters most without leaving Canvas.</p>
             <button type="button" className="primary-button" onClick={() => void handleOpenLogin()}>
