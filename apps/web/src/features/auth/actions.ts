@@ -94,6 +94,11 @@ async function resendSignupVerification(email: string, next: string) {
   });
 }
 
+async function buildPasswordResetRedirect() {
+  const origin = await getAppOrigin();
+  return `${origin}/reset-password`;
+}
+
 export async function loginAction(
   _previousState: AuthActionState,
   formData: FormData,
@@ -210,6 +215,37 @@ export async function signupAction(
   }
 
   redirect("/extension");
+}
+
+export async function forgotPasswordAction(
+  _previousState: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  const email = readField(formData, "email");
+  const normalizedEmail = email.toLowerCase();
+
+  if (!email) {
+    return {
+      status: "error",
+      message: "Enter the email address for your Dueable account.",
+    };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const redirectTo = await buildPasswordResetRedirect();
+  const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, { redirectTo });
+
+  if (error) {
+    return {
+      status: "error",
+      message: "We couldn't send a reset link right now. Try again in a moment.",
+    };
+  }
+
+  return {
+    status: "success",
+    message: "If that email is connected to a Dueable account, we sent a password reset link.",
+  };
 }
 
 export async function signOutAction() {

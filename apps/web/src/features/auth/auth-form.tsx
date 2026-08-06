@@ -45,6 +45,8 @@ export function AuthForm({
   title,
   description,
   submitLabel,
+  auxiliaryLinkLabel,
+  auxiliaryLinkHref,
   footerPrompt,
   footerLinkLabel,
   footerHref,
@@ -57,6 +59,8 @@ export function AuthForm({
   title: string;
   description: string;
   submitLabel: string;
+  auxiliaryLinkLabel?: string;
+  auxiliaryLinkHref?: string;
   footerPrompt: string;
   footerLinkLabel: string;
   footerHref: string;
@@ -69,6 +73,7 @@ export function AuthForm({
   const [state, formAction] = useActionState(action, initialState);
   const nextField = fields.find((field) => field.name === "next")?.defaultValue ?? "/dashboard";
   const footerLinkWithNext = footerHref.startsWith("/") ? `${footerHref}?next=${encodeURIComponent(nextField)}` : footerHref;
+  const auxiliaryLinkWithNext = auxiliaryLinkHref?.startsWith("/") ? `${auxiliaryLinkHref}?next=${encodeURIComponent(nextField)}` : auxiliaryLinkHref;
 
   return (
     <div className="w-full max-w-md rounded-[32px] border border-white/70 bg-white/90 p-8 shadow-[0_24px_70px_-34px_rgba(15,23,42,0.28)] backdrop-blur-xl sm:p-10">
@@ -119,6 +124,14 @@ export function AuthForm({
           >
             {state.message}
           </p>
+        ) : null}
+
+        {auxiliaryLinkWithNext && auxiliaryLinkLabel ? (
+          <div className="-mt-1 flex justify-end">
+            <Link href={auxiliaryLinkWithNext} className="text-sm font-medium text-sky-700 hover:text-sky-800">
+              {auxiliaryLinkLabel}
+            </Link>
+          </div>
         ) : null}
 
         <SubmitButton label={submitLabel} />
