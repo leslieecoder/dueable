@@ -83,7 +83,7 @@ async function getAppOrigin() {
 async function resendSignupVerification(email: string, next: string) {
   const supabase = await createSupabaseServerClient();
   const origin = await getAppOrigin();
-  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next.startsWith("/") ? next : "/onboarding")}`;
+  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next.startsWith("/") ? next : "/extension")}`;
 
   await supabase.auth.resend({
     type: "signup",
@@ -100,7 +100,7 @@ export async function loginAction(
 ): Promise<AuthActionState> {
   const email = readField(formData, "email");
   const password = readField(formData, "password");
-  const next = readField(formData, "next") || "/onboarding";
+  const next = readField(formData, "next") || "/extension";
   const normalizedEmail = email.toLowerCase();
 
   if (!email || !password) {
@@ -146,7 +146,7 @@ export async function loginAction(
     data.user.id,
   );
 
-  redirect(next.startsWith("/") ? next : "/onboarding");
+  redirect(next.startsWith("/") ? next : "/extension");
 }
 
 export async function signupAction(
@@ -209,7 +209,7 @@ export async function signupAction(
     };
   }
 
-  redirect("/onboarding");
+  redirect("/extension");
 }
 
 export async function signOutAction() {
@@ -219,10 +219,10 @@ export async function signOutAction() {
 }
 
 export async function signInWithGoogleAction(formData: FormData) {
-  const next = readField(formData, "next") || "/onboarding";
+  const next = readField(formData, "next") || "/extension";
   const supabase = await createSupabaseServerClient();
   const origin = await getAppOrigin();
-  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next.startsWith("/") ? next : "/onboarding")}`;
+  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next.startsWith("/") ? next : "/extension")}`;
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",

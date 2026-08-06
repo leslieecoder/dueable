@@ -33,8 +33,9 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
+  const next = request.nextUrl.searchParams.get("next");
   const isAuthRoute = pathname.startsWith("/login") || pathname.startsWith("/signup");
-  const isProtectedRoute = pathname.startsWith("/dashboard") || pathname.startsWith("/assignments") || pathname.startsWith("/onboarding");
+  const isProtectedRoute = pathname.startsWith("/dashboard") || pathname.startsWith("/assignments") || pathname.startsWith("/onboarding") || pathname.startsWith("/extension");
 
   if (!user && isProtectedRoute) {
     const url = request.nextUrl.clone();
@@ -45,7 +46,8 @@ export async function updateSession(request: NextRequest) {
 
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/onboarding";
+    url.pathname = next?.startsWith("/") ? next : "/extension";
+    url.search = "";
     return NextResponse.redirect(url);
   }
 
