@@ -20,9 +20,9 @@ export const metadata: Metadata = {
   title: "Dueable",
   description: "An academic planner that turns Canvas assignments into clear daily work.",
   icons: {
-    icon: "/assets/logo.png",
-    shortcut: "/assets/logo.png",
-    apple: "/assets/logo.png",
+    icon: "/icon.png",
+    shortcut: "/icon.png",
+    apple: "/icon.png",
   },
 };
 
