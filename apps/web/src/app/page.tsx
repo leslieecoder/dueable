@@ -120,7 +120,7 @@ export default async function Home() {
       <section className="relative isolate border-b border-[#e8edf6] bg-[radial-gradient(circle_at_top_left,rgba(72,117,255,0.14),transparent_25%),radial-gradient(circle_at_82%_16%,rgba(18,201,151,0.10),transparent_18%),linear-gradient(180deg,#f8faff_0%,#f7f8fc_100%)]">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5 sm:px-10 lg:px-12">
           <Link href="/" className="inline-flex items-center gap-3">
-            <Image src="/assets/complete-logo.png" alt="Dueable" width={132} height={34} priority className="h-auto w-[132px]" />
+            <Image src="/assets/complete-logo.png" alt="Dueable" width={132} height={34} priority className="h-auto w-33" />
           </Link>
 
           <nav className="hidden items-center gap-8 text-sm font-medium text-[#5270ab] md:flex">
@@ -145,10 +145,10 @@ export default async function Home() {
         <div className="mx-auto grid max-w-7xl gap-16 px-6 pb-18 pt-10 sm:px-10 lg:grid-cols-[minmax(0,1.02fr)_minmax(0,1fr)] lg:px-12 lg:pb-24 lg:pt-16">
           <div className="max-w-2xl self-center">
             <p className="dueable-eyebrow text-[#5f7ec2]">Built for the student tab spiral</p>
-            <h1 className="mt-6 font-[family-name:var(--font-fraunces)] text-[3.45rem] leading-[0.92] tracking-[-0.06em] text-[#17233f] sm:text-[4.8rem]">
+            <h1 className="mt-6 font-(family-name:--font-fraunces) text-[3.45rem] leading-[0.92] tracking-[-0.06em] text-[#17233f] sm:text-[4.8rem]">
               Stop drowning
               <br />
-              in <span className="bg-gradient-to-r from-[#3f79ff] to-[#4d8efb] bg-clip-text italic text-transparent">assignments.</span>
+              in <span className="bg-linear-to-r from-[#3f79ff] to-[#4d8efb] bg-clip-text italic text-transparent">assignments.</span>
               <br />
               Start finishing
               <br />
@@ -178,7 +178,7 @@ export default async function Home() {
 
           <div className="relative flex items-center justify-center lg:justify-end">
             <div className="absolute inset-x-6 top-10 h-72 rounded-full bg-[radial-gradient(circle,rgba(55,112,239,0.18),transparent_60%)] blur-3xl sm:inset-x-16" />
-            <div className="relative w-full max-w-[610px]">
+            <div className="relative w-full max-w-152.5">
               <div className="relative rounded-[28px] border border-[#dde5f4] bg-[#13233d] p-3 shadow-[0_38px_80px_-34px_rgba(18,35,61,0.42)]">
                 <div className="flex items-center gap-2 rounded-[18px] bg-[#0f1d34] px-4 py-3 text-[0.72rem] text-[#9cb0d1]">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#ff6d5b]" />
@@ -187,14 +187,14 @@ export default async function Home() {
                   <span className="ml-3 truncate">app.dueable.com</span>
                 </div>
                 <div className="mt-3 overflow-hidden rounded-[22px] bg-[#f6f8fd]">
-                  <div className="grid min-h-[360px] grid-cols-[92px_minmax(0,1fr)] sm:min-h-[390px]">
+                  <div className="grid min-h-90 grid-cols-[92px_minmax(0,1fr)] sm:min-h-97.5">
                     <div className="border-r border-[#e5ebf6] bg-white px-3 py-4">
                       <div className="rounded-2xl bg-[#edf3ff] px-3 py-2 text-[0.72rem] font-semibold text-[#2f62d8]">Home</div>
                       <div className="mt-3 rounded-2xl px-3 py-2 text-[0.72rem] font-semibold text-[#7f90ad]">Extension</div>
                     </div>
                     <div className="relative px-4 py-4 sm:px-5 sm:py-5">
                       <div className="flex flex-wrap items-center gap-2 text-[0.68rem] font-semibold text-[#7f8aa1]">
-                        <Image src="/assets/complete-logo.png" alt="Dueable" width={78} height={20} className="mr-auto h-auto w-[78px]" />
+                        <Image src="/assets/complete-logo.png" alt="Dueable" width={78} height={20} className="mr-auto h-auto w-19.5" />
                         <span className="rounded-full bg-[#f2f6ff] px-2.5 py-1 text-[#4a74d2]">12 active</span>
                         <span className="rounded-full bg-[#fff2ee] px-2.5 py-1 text-[#ef6b4a]">35 overdue</span>
                         <span className="rounded-full bg-[#ecfaf4] px-2.5 py-1 text-[#1a9d65]">2 work ahead</span>
@@ -208,7 +208,7 @@ export default async function Home() {
                           <span className="rounded-full bg-[#edf8f3] px-2.5 py-1 text-[#209b64]">7-day streak</span>
                         </div>
                         <div className="mt-4 h-2.5 rounded-full bg-[#edf1f8]">
-                          <div className="h-full w-[44%] rounded-full bg-gradient-to-r from-[#3c79f6] to-[#45c89e]" />
+                          <div className="h-full w-[44%] rounded-full bg-linear-to-r from-[#3c79f6] to-[#45c89e]" />
                         </div>
                         <div className="mt-4 flex items-center justify-between gap-3">
                           <div>
@@ -226,7 +226,7 @@ export default async function Home() {
                         <p className="mt-1 text-[0.82rem] font-medium text-[#5a6984]">Keep it up!</p>
                       </div>
 
-                      <div className="absolute -right-2 top-24 w-[168px] rounded-[22px] bg-white p-4 shadow-[0_24px_54px_-26px_rgba(45,108,223,0.45)] sm:-right-8 sm:w-[188px]">
+                      <div className="absolute -right-2 top-24 w-42 rounded-[22px] bg-white p-4 shadow-[0_24px_54px_-26px_rgba(45,108,223,0.45)] sm:-right-8 sm:w-47">
                         <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[#9ea8ba]">Focus session</p>
                         <p className="mt-2 text-[2rem] font-semibold leading-none text-[#2f64d8]">25:00</p>
                         <div className="mt-4 flex gap-2 text-[0.66rem] font-semibold text-[#74839d]">
@@ -253,7 +253,7 @@ export default async function Home() {
             const Icon = stat.icon;
             return (
               <div key={stat.label} className="text-center">
-                <div className="flex items-center justify-center gap-1.5 text-[2rem] font-semibold tracking-[-0.05em] text-[#1b2742] sm:text-[2.3rem]">
+                <div className="flex items-center justify-center gap-1.5 text-[2rem] font-semibold tracking-tighter text-[#1b2742] sm:text-[2.3rem]">
                   <span>{stat.value}</span>
                   {Icon ? <Icon className="h-5 w-5 fill-[#1b2742] text-[#1b2742]" /> : null}
                 </div>
@@ -268,10 +268,10 @@ export default async function Home() {
         <div className="mx-auto max-w-7xl px-6 sm:px-10 lg:px-12">
           <div className="text-center">
             <p className="dueable-eyebrow text-[#5d86e7]">Features</p>
-            <h2 className="mt-5 font-[family-name:var(--font-fraunces)] text-[2.8rem] leading-[0.98] tracking-[-0.05em] text-[#17233f] sm:text-[3.8rem]">
+            <h2 className="mt-5 font-(family-name:--font-fraunces) text-[2.8rem] leading-[0.98] tracking-tighter text-[#17233f] sm:text-[3.8rem]">
               Everything you need to
               <br />
-              <span className="bg-gradient-to-r from-[#3c79f6] to-[#2dbd92] bg-clip-text italic text-transparent">stop guessing and start finishing</span>
+              <span className="bg-linear-to-r from-[#3c79f6] to-[#2dbd92] bg-clip-text italic text-transparent">stop guessing and start finishing</span>
             </h2>
           </div>
 
@@ -281,7 +281,7 @@ export default async function Home() {
               return (
                 <article
                   key={feature.title}
-                  className={`rounded-[28px] border border-white/80 bg-gradient-to-b ${feature.accent} p-7 shadow-[0_20px_46px_-34px_rgba(15,23,42,0.22)]`}
+                  className={`rounded-[28px] border border-white/80 bg-linear-to-b ${feature.accent} p-7 shadow-[0_20px_46px_-34px_rgba(15,23,42,0.22)]`}
                 >
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[#5282ef] shadow-[0_14px_28px_-20px_rgba(45,108,223,0.45)]">
                     <Icon className="h-5 w-5" />
@@ -300,10 +300,10 @@ export default async function Home() {
         <div className="mx-auto grid max-w-7xl gap-12 px-6 sm:px-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:px-12">
           <div className="max-w-2xl">
             <p className="dueable-eyebrow text-[#5d86e7]">How it works</p>
-            <h2 className="mt-5 font-[family-name:var(--font-fraunces)] text-[2.8rem] leading-[0.98] tracking-[-0.05em] text-[#17233f] sm:text-[3.8rem]">
+            <h2 className="mt-5 font-(family-name:--font-fraunces) text-[2.8rem] leading-[0.98] tracking-tighter text-[#17233f] sm:text-[3.8rem]">
               Up and running in
               <br />
-              <span className="bg-gradient-to-r from-[#2abf95] to-[#1ea97d] bg-clip-text italic text-transparent">under 2 minutes</span>
+              <span className="bg-linear-to-r from-[#2abf95] to-[#1ea97d] bg-clip-text italic text-transparent">under 2 minutes</span>
             </h2>
 
             <div className="mt-10 space-y-8">
@@ -324,7 +324,7 @@ export default async function Home() {
           <div className="relative">
             <div className="rounded-[34px] border border-[#dfe6f2] bg-[linear-gradient(145deg,#203754_0%,#0f1d31_100%)] p-4 shadow-[0_40px_80px_-44px_rgba(15,23,42,0.5)]">
               <div className="overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02)),linear-gradient(180deg,#1e2d41_0%,#152337_100%)] p-8 sm:p-10">
-                <div className="mx-auto max-w-[380px] rounded-[28px] bg-white/94 p-6 shadow-[0_24px_50px_-32px_rgba(15,23,42,0.55)] backdrop-blur">
+                <div className="mx-auto max-w-95 rounded-[28px] bg-white/94 p-6 shadow-[0_24px_50px_-32px_rgba(15,23,42,0.55)] backdrop-blur">
                   <div className="flex items-center gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#e8efff] text-sm font-semibold text-[#3f73ea]">MR</div>
                     <div>
@@ -332,7 +332,7 @@ export default async function Home() {
                       <p className="text-xs text-[#8090ac]">Junior, Communication Studies</p>
                     </div>
                   </div>
-                  <p className="mt-5 font-[family-name:var(--font-fraunces)] text-[1.45rem] leading-[1.25] tracking-[-0.03em] text-[#18243e]">
+                  <p className="mt-5 font-(family-name:--font-fraunces) text-[1.45rem] leading-tight tracking-[-0.03em] text-[#18243e]">
                     &ldquo;I used to waste time figuring out where to start. Now I open Dueable and follow the queue.&rdquo;
                   </p>
                 </div>
@@ -346,7 +346,7 @@ export default async function Home() {
         <div className="mx-auto max-w-7xl px-6 sm:px-10 lg:px-12">
           <div className="text-center">
             <p className="dueable-eyebrow text-[#5d86e7]">Student stories</p>
-            <h2 className="mt-5 font-[family-name:var(--font-fraunces)] text-[2.8rem] leading-[0.98] tracking-[-0.05em] text-[#17233f] sm:text-[3.6rem]">Students who turned it around</h2>
+            <h2 className="mt-5 font-(family-name:--font-fraunces) text-[2.8rem] leading-[0.98] tracking-tighter text-[#17233f] sm:text-[3.6rem]">Students who turned it around</h2>
           </div>
 
           <div className="mt-14 grid gap-5 lg:grid-cols-3">
@@ -374,12 +374,12 @@ export default async function Home() {
       <section className="bg-[#132239] px-6 py-20 text-white sm:px-10 sm:py-24 lg:px-12">
         <div className="mx-auto max-w-4xl text-center">
           <p className="dueable-eyebrow text-[#6f8ec5]">Get started today</p>
-          <h2 className="mt-5 font-[family-name:var(--font-fraunces)] text-[3rem] leading-[0.96] tracking-[-0.05em] sm:text-[4.3rem]">
+          <h2 className="mt-5 font-(family-name:--font-fraunces) text-[3rem] leading-[0.96] tracking-tighter sm:text-[4.3rem]">
             Your assignments
             <br />
             won&apos;t wait.
             <br />
-            <span className="bg-gradient-to-r from-[#37d1a7] to-[#22a77d] bg-clip-text italic text-transparent">Neither should you.</span>
+            <span className="bg-linear-to-r from-[#37d1a7] to-[#22a77d] bg-clip-text italic text-transparent">Neither should you.</span>
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-[1.02rem] leading-8 text-[#8ea0be]">
             Install the extension, open your queue, and start chipping away at the work that actually matters first.
@@ -400,6 +400,18 @@ export default async function Home() {
             </Link>
           </div>
           <p className="mt-5 text-sm text-[#667a9d]">Free to start. Built for students who need a cleaner way to get through the week.</p>
+
+          <div className="mt-12 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-[#8ea0be]">
+            <Link href="/privacy" className="transition hover:text-white">
+              Privacy
+            </Link>
+            <Link href={user ? "/extension" : "/login?next=%2Fextension"} className="transition hover:text-white">
+              Extension
+            </Link>
+            <Link href={user ? "/dashboard" : "/login?next=%2Fdashboard"} className="transition hover:text-white">
+              Web app
+            </Link>
+          </div>
         </div>
       </section>
     </main>
