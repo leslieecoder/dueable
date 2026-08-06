@@ -96,7 +96,7 @@ async function resendSignupVerification(email: string, next: string) {
 
 async function buildPasswordResetRedirect() {
   const origin = await getAppOrigin();
-  return `${origin}/reset-password`;
+  return `${origin}/auth/callback?next=${encodeURIComponent("/reset-password")}`;
 }
 
 export async function loginAction(
