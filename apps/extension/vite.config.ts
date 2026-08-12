@@ -42,12 +42,7 @@ function buildManifestPlugin(webOrigin: string): Plugin {
     apply: "build",
     generateBundle() {
       const normalizedOrigin = normalizeOrigin(webOrigin);
-      const hostPermissions = [
-        `${normalizedOrigin}/*`,
-        "*://*/courses/*",
-        "*://*/assignments/*",
-        "*://*.instructure.com/*",
-      ];
+      const hostPermissions = [`${normalizedOrigin}/*`];
 
       const manifest = {
         manifest_version: 3,
