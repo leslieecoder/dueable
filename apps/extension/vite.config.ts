@@ -1,6 +1,12 @@
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+
+const extensionPackageJson = JSON.parse(
+  readFileSync(resolve(__dirname, "package.json"), "utf8"),
+) as { version?: string };
+const EXTENSION_VERSION = extensionPackageJson.version ?? "0.1.0";
 
 function normalizeOrigin(value: string) {
   return value.trim().replace(/\/$/, "");
@@ -47,7 +53,7 @@ function buildManifestPlugin(webOrigin: string): Plugin {
         manifest_version: 3,
         name: "Dueable",
         description: "Canvas import tools for the Dueable planner.",
-        version: "0.1.0",
+        version: EXTENSION_VERSION,
         action: {
           default_title: "Dueable",
         },
