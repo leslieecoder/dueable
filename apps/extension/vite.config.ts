@@ -6,6 +6,30 @@ function normalizeOrigin(value: string) {
   return value.trim().replace(/\/$/, "");
 }
 
+function isLocalOrigin(value: string) {
+  try {
+    const url = new URL(value);
+
+    return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
+const DEFAULT_DUEABLE_WEB_ORIGIN = "https://dueable-web.vercel.app";
+
+function resolveWebOrigin(mode: string, fileOrigin?: string) {
+  const shellOrigin = process.env.VITE_DUEABLE_WEB_ORIGIN ?? process.env.VITE_DUEABLE_DASHBOARD_URL;
+  const allowLocalhostOrigin = process.env.VITE_DUEABLE_ALLOW_LOCALHOST_ORIGIN === "true";
+  const configuredOrigin = normalizeOrigin(shellOrigin || fileOrigin || DEFAULT_DUEABLE_WEB_ORIGIN);
+
+  if (mode === "production" && !allowLocalhostOrigin && isLocalOrigin(configuredOrigin)) {
+    return DEFAULT_DUEABLE_WEB_ORIGIN;
+  }
+
+  return configuredOrigin;
+}
+
 function buildManifestPlugin(webOrigin: string): Plugin {
   return {
     name: "dueable-extension-manifest",
@@ -55,7 +79,7 @@ function buildManifestPlugin(webOrigin: string): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, "");
-  const webOrigin = normalizeOrigin(env.VITE_DUEABLE_WEB_ORIGIN || env.VITE_DUEABLE_DASHBOARD_URL || "https://dueable-web.vercel.app");
+  const webOrigin = resolveWebOrigin(mode, env.VITE_DUEABLE_WEB_ORIGIN || env.VITE_DUEABLE_DASHBOARD_URL);
 
   return {
     base: "./",

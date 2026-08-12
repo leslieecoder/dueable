@@ -334,6 +334,17 @@ export async function getExtensionOverview(): Promise<ExtensionOverviewPayload> 
   const closedOverdueAssignments = builtAssignments
     .filter((assignment) => assignment.plannerBucket === "closed_overdue")
     .sort(compareAssignments);
+  const laterAssignments = builtAssignments
+    .filter((assignment) => assignment.plannerBucket === "later")
+    .sort(compareAssignments);
+
+  const fallbackWorkAheadAssignments =
+    weeklyAssignments.length === 0 &&
+    workAheadAssignments.length === 0 &&
+    overdueAssignments.length === 0 &&
+    closedOverdueAssignments.length === 0
+      ? applyPriorityLabels(laterAssignments)
+      : workAheadAssignments;
 
   const [topAssignment, ...upcoming] = weeklyAssignments;
 
@@ -362,7 +373,7 @@ export async function getExtensionOverview(): Promise<ExtensionOverviewPayload> 
           }
         : null,
     upcoming,
-    workAhead: workAheadAssignments,
+    workAhead: fallbackWorkAheadAssignments,
     overdue: overdueAssignments,
     closedOverdue: closedOverdueAssignments,
   };

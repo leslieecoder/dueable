@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CircleDashed } from "lucide-react";
+import { CircleDashed, X } from "lucide-react";
 import { AllAssignmentsCompleted } from "./components/AllAssignmentsCompleted";
 import { AssignmentCompleted } from "./components/AssignmentCompleted";
 import { getCanvasBaseUrl, getCanvasCourses, isLikelyCanvasUrl, type CanvasCourse } from "./lib/canvas/api";
 import { filterCurrentSemesterCourses } from "./lib/canvas/course-filter";
-import { EXTENSION_AUTH_COMPLETE_PATH, EXTENSION_AUTH_HANDOFF_STORAGE_KEY, getDueableUrl } from "./lib/dueable-app";
+import { DUEABLE_WEB_ORIGIN, EXTENSION_AUTH_COMPLETE_PATH, EXTENSION_AUTH_HANDOFF_STORAGE_KEY, getDueableUrl } from "./lib/dueable-app";
 import { importSemester, type CanvasSemesterImportProgress } from "./lib/canvas/semester-importer";
 import { ExtensionMessage } from "./lib/messages";
 import { AssignmentSteps } from "./components/AssignmentSteps";
@@ -107,7 +107,6 @@ function getQueueAssignmentIds(payload: ExtensionOverviewResponse, queue: Planne
 }
 
 const FIRST_LOGIN_REDIRECT_KEY = "dueableHasOpenedLoginFromPanel";
-const IMPORT_ONBOARDING_SEEN_KEY = "dueableHasSeenImportOnboarding";
 const ASSIGNMENT_COMPLETED_AUTO_ADVANCE_MS = 1400;
 
 function buildImportProgressState(progress: CanvasSemesterImportProgress): ImportProgressState {
@@ -184,6 +183,36 @@ function getFriendlyCanvasMessage(detail?: string) {
   }
 
   return detail ?? "We couldn't read your Canvas classes right now. Try refreshing Canvas and reopening the extension.";
+}
+
+function getUnexpectedDueableResponseMessage() {
+  return `Dueable returned a web page instead of extension data. Refresh Dueable and reopen the extension. If this keeps happening, reinstall the latest extension build pointed at ${DUEABLE_WEB_ORIGIN}.`;
+}
+
+async function readDueableJson<T>(response: Response): Promise<T> {
+  const rawBody = await response.text();
+
+  if (rawBody.length === 0) {
+    return {} as T;
+  }
+
+  try {
+    return JSON.parse(rawBody) as T;
+  } catch {
+    const trimmedBody = rawBody.trimStart();
+    const contentType = response.headers.get("content-type") ?? "";
+
+    if (
+      contentType.includes("text/html")
+      || trimmedBody.startsWith("<!DOCTYPE")
+      || trimmedBody.startsWith("<html")
+      || trimmedBody.startsWith("<")
+    ) {
+      throw new Error(getUnexpectedDueableResponseMessage());
+    }
+
+    throw new Error("Dueable returned an invalid response. Try reopening the extension.");
+  }
 }
 
 function getZeroImportMessage(payload: ImportSemesterResponse) {
@@ -336,20 +365,28 @@ function formatPoints(pointsPossible: number | null) {
   return `${Number.isInteger(pointsPossible) ? pointsPossible.toFixed(0) : pointsPossible.toFixed(1)} pts`;
 }
 
-function getWeeklySummaryTitle(assignmentCount: number) {
-  if (assignmentCount <= 0) {
-    return "Nothing due this week";
+function getQueueBannerCopy(queue: PlannerQueueTab) {
+  if (queue === "overdue") {
+    return {
+      eyebrow: "OVERDUE TO TACKLE",
+      title: "Let’s recover the most important misses first.",
+      subtitle: "Dueable keeps the most urgent open work at the top so you can recover in the right order.",
+    };
   }
 
-  return `${assignmentCount} assignment${assignmentCount === 1 ? "" : "s"} this week`;
-}
-
-function getWeeklySummarySubtitle(assignmentCount: number) {
-  if (assignmentCount <= 0) {
-    return "You are clear for now.";
+  if (queue === "work_ahead") {
+    return {
+      eyebrow: "WORK AHEAD",
+      title: "Start early on the assignments worth front-loading.",
+      subtitle: "Dueable moved the larger future work here so you can get ahead without overloading yourself.",
+    };
   }
 
-  return "Start with the highest-impact one.";
+  return {
+    eyebrow: "YOUR PRIORITY QUEUE",
+    title: "Let’s knock out your assignments — highest impact first.",
+    subtitle: "Dueable ranked them so you don't have to guess what to do next.",
+  };
 }
 
 function App() {
@@ -368,13 +405,13 @@ function App() {
   const [importStage, setImportStage] = useState<ImportStage>("idle");
   const [importSummary, setImportSummary] = useState<{ coursesImported: number; assignmentsImported: number } | null>(null);
   const [importProgress, setImportProgress] = useState<ImportProgressState | null>(null);
-  const [showImportOnboarding, setShowImportOnboarding] = useState(false);
   const [errorDisplay, setErrorDisplay] = useState<ErrorDisplayState>(getDefaultCanvasPrompt);
   const [selectedCourseFilter, setSelectedCourseFilter] = useState<CourseFilterValue>("all");
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [expandedAssignmentId, setExpandedAssignmentId] = useState<string | null>(null);
   const [showClosedOverdueAssignments, setShowClosedOverdueAssignments] = useState(false);
   const [revealedQueue, setRevealedQueue] = useState<PlannerQueueView>(null);
+  const [showQueueBanner, setShowQueueBanner] = useState(true);
 
   useEffect(() => {
     selectedAssignmentIdRef.current = selectedAssignmentId;
@@ -421,11 +458,11 @@ function App() {
         setImportStage("idle");
         setImportSummary(null);
         setImportProgress(null);
-        setShowImportOnboarding(false);
         setErrorDisplay(getDefaultCanvasPrompt());
         setSelectedCourseFilter("all");
         setExpandedAssignmentId(null);
         setRevealedQueue(null);
+        setShowQueueBanner(true);
       }
 
       const overviewResponse = await fetch(getDueableUrl("/api/extension/overview"), {
@@ -436,7 +473,7 @@ function App() {
         },
       });
 
-      const payload = (await overviewResponse.json()) as ExtensionOverviewResponse;
+      const payload = await readDueableJson<ExtensionOverviewResponse>(overviewResponse);
 
       if (overviewResponse.status === 401) {
         setOverview(null);
@@ -681,7 +718,7 @@ function App() {
         body: JSON.stringify(result),
       });
 
-      const payload = (await response.json()) as ImportSemesterResponse;
+      const payload = await readDueableJson<ImportSemesterResponse>(response);
 
       if (!response.ok || !payload.success) {
         throw new Error(getFriendlyExtensionMessage("import", payload.error));
@@ -697,7 +734,6 @@ function App() {
         coursesImported: payload.coursesImported ?? result.coursesImported,
         assignmentsImported: payload.assignmentsImported ?? result.assignmentsImported,
       });
-      setShowImportOnboarding((payload.assignmentsImported ?? result.assignmentsImported) > 0 && !(await getStoredFlag(IMPORT_ONBOARDING_SEEN_KEY)));
       setFeedbackMessage(
         (payload.assignmentsImported ?? result.assignmentsImported) > 0
           ? "Your assignments are ready. Pick one and start a focus block."
@@ -726,7 +762,7 @@ function App() {
         body: JSON.stringify({ assignmentId }),
       });
 
-      const payload = (await response.json()) as CompleteAssignmentResponse;
+      const payload = await readDueableJson<CompleteAssignmentResponse>(response);
 
       if (!response.ok || !payload.success || !payload.overview) {
         throw new Error(getFriendlyExtensionMessage("complete-assignment", payload.error));
@@ -762,13 +798,39 @@ function App() {
         credentials: "include",
       });
 
-      const payload = (await response.json()) as ClearImportsResponse;
+      const payload = await readDueableJson<ClearImportsResponse>(response);
 
       if (!response.ok || !payload.success) {
         throw new Error(payload.error ?? "We couldn't clear your imported assignments right now.");
       }
 
-      await loadExtensionState();
+      setOverview(null);
+      setCompletionState(null);
+      setSelectedAssignmentId(null);
+      setExpandedAssignmentId(null);
+      setSelectedCourseFilter("all");
+      setRevealedQueue(null);
+      setShowClosedOverdueAssignments(false);
+      setImportStage("idle");
+      setImportSummary(null);
+      setImportProgress(null);
+
+      const activeTab = await getActiveTab();
+      const isCanvasTab = await detectCanvasTab(activeTab.id, activeTab.url);
+
+      if (isCanvasTab) {
+        const canvasBaseUrl = getCanvasBaseUrl(activeTab.url);
+        const courses = await getCanvasCourses(activeTab.id, canvasBaseUrl);
+        const { currentCourses } = filterCurrentSemesterCourses(courses);
+
+        setCurrentCanvasCourses(currentCourses);
+        setViewState("needs-import");
+      } else {
+        setCurrentCanvasCourses([]);
+        setErrorDisplay(getDefaultCanvasPrompt());
+        setViewState("error");
+      }
+
       setFeedbackMessage(payload.message ?? "Your imported Canvas assignments were removed. You can import again now.");
     } catch (error) {
       setFeedbackMessage(error instanceof Error ? error.message : "We couldn't clear your imported assignments right now.");
@@ -787,7 +849,7 @@ function App() {
         credentials: "include",
       });
 
-      const payload = (await response.json()) as LogoutResponse;
+      const payload = await readDueableJson<LogoutResponse>(response);
 
       if (!response.ok || !payload.success) {
         throw new Error(payload.error ?? "We couldn't log you out right now. Try again in a moment.");
@@ -830,11 +892,6 @@ function App() {
   }, [completionState, viewState]);
 
   async function handleContinueAfterImport() {
-    if (showImportOnboarding) {
-      await setStoredFlag(IMPORT_ONBOARDING_SEEN_KEY, true);
-      setShowImportOnboarding(false);
-    }
-
     await loadExtensionState();
   }
 
@@ -849,6 +906,7 @@ function App() {
     setExpandedAssignmentId(null);
     setSelectedCourseFilter("all");
     setShowClosedOverdueAssignments(false);
+    setShowQueueBanner(true);
   }
 
   function handleRevealOverdue() {
@@ -862,6 +920,7 @@ function App() {
     setExpandedAssignmentId(null);
     setSelectedCourseFilter("all");
     setShowClosedOverdueAssignments(false);
+    setShowQueueBanner(true);
   }
 
   function handleSelectQueue(queue: PlannerQueueTab) {
@@ -869,6 +928,7 @@ function App() {
     setExpandedAssignmentId(null);
     setSelectedCourseFilter("all");
     setShowClosedOverdueAssignments(false);
+    setShowQueueBanner(true);
 
     if (queue === "this_week") {
       setRevealedQueue(null);
@@ -1010,8 +1070,13 @@ function App() {
   const showClosedOverdueToggle = viewState === "ready" && activeQueueTab === "overdue" && hasClosedOverdueAssignments;
   const showOverdueEmptyState = viewState === "ready" && activeQueueTab === "overdue" && !displayedAssignment;
   const showWorkAheadEmptyState = viewState === "ready" && activeQueueTab === "work_ahead" && !displayedAssignment;
-  const weeklySummaryTitle = getWeeklySummaryTitle(availableQueueCounts.thisWeek);
-  const weeklySummarySubtitle = getWeeklySummarySubtitle(availableQueueCounts.thisWeek);
+  const queueBannerCopy = getQueueBannerCopy(activeQueueTab);
+  const displayedAssignmentPosition = displayedAssignment
+    ? Math.max(1, formattedVisibleAssignments.findIndex((assignment) => assignment.id === displayedAssignment.id) + 1)
+    : 0;
+  const queueBannerProgress = formattedVisibleAssignments.length > 0
+    ? Math.max(8, Math.round((displayedAssignmentPosition / formattedVisibleAssignments.length) * 100))
+    : 0;
 
   return (
     <main ref={popupShellRef} className="popup-shell">
@@ -1059,7 +1124,6 @@ function App() {
           importStage={importStage}
           importSummary={importSummary}
           importProgress={importProgress}
-          showImportOnboarding={showImportOnboarding}
           isImporting={isImporting}
           isResetting={isResettingImports}
           feedbackMessage={feedbackMessage}
@@ -1091,10 +1155,6 @@ function App() {
 
       {showQueueTabs ? (
         <section className="popup-panel popup-panel-compact">
-          <div className="queue-tabs-header">
-            <p className="queue-tabs-title">{weeklySummaryTitle}</p>
-            <p className="queue-tabs-subtitle">{weeklySummarySubtitle}</p>
-          </div>
           <div className="queue-tabs" role="tablist" aria-label="Assignment queues">
             <button
               type="button"
@@ -1150,6 +1210,29 @@ function App() {
                   {option.label}
                 </button>
               ))}
+            </div>
+          ) : null}
+          {showQueueBanner && formattedVisibleAssignments.length > 0 ? (
+            <div className={`queue-banner-card queue-banner-card-${activeQueueTab}`}>
+              <button
+                type="button"
+                className="queue-banner-close"
+                aria-label="Hide priority queue message"
+                onClick={() => setShowQueueBanner(false)}
+              >
+                <X size={20} strokeWidth={2.1} />
+              </button>
+              <p className="queue-banner-eyebrow">{queueBannerCopy.eyebrow}</p>
+              <h2 className="queue-banner-title">{queueBannerCopy.title}</h2>
+              <p className="queue-banner-copy">{queueBannerCopy.subtitle}</p>
+              <div className="queue-banner-progress-row">
+                <div className="queue-banner-progress-track" aria-hidden="true">
+                  <div className="queue-banner-progress-fill" style={{ width: `${queueBannerProgress}%` }} />
+                </div>
+                <span className="queue-banner-progress-copy">
+                  {displayedAssignmentPosition} of {formattedVisibleAssignments.length} ranked
+                </span>
+              </div>
             </div>
           ) : null}
         </section>

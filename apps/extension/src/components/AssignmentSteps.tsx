@@ -395,32 +395,32 @@ export function AssignmentSteps({
       </div>
 
       <div className="focus-steps-shell checklist-shell priority-card-expanded-shell">
-        <div className="pomodoro-shell">
+        <div className={`pomodoro-shell pomodoro-shell-${phase}`}>
         <div className="pomodoro-shell-header">
           <p className="steps-heading pomodoro-shell-label">{getPhaseLabel(phase)}</p>
         </div>
 
         <div className="pomodoro-phase-tabs" role="tablist" aria-label="Focus timer phases">
-          <button type="button" className={`pomodoro-phase-tab${phase === "work" ? " pomodoro-phase-tab-active" : ""}`} onClick={() => resetTimer("work")}>
+          <button type="button" className={`pomodoro-phase-tab pomodoro-phase-tab-work${phase === "work" ? " pomodoro-phase-tab-active pomodoro-phase-tab-active-work" : ""}`} onClick={() => resetTimer("work")}>
             Pomodoro
           </button>
-          <button type="button" className={`pomodoro-phase-tab${phase === "short_break" ? " pomodoro-phase-tab-active" : ""}`} onClick={() => resetTimer("short_break")}>
+          <button type="button" className={`pomodoro-phase-tab pomodoro-phase-tab-short_break${phase === "short_break" ? " pomodoro-phase-tab-active pomodoro-phase-tab-active-short_break" : ""}`} onClick={() => resetTimer("short_break")}>
             Short break
           </button>
-          <button type="button" className={`pomodoro-phase-tab${phase === "long_break" ? " pomodoro-phase-tab-active" : ""}`} onClick={() => resetTimer("long_break")}>
+          <button type="button" className={`pomodoro-phase-tab pomodoro-phase-tab-long_break${phase === "long_break" ? " pomodoro-phase-tab-active pomodoro-phase-tab-active-long_break" : ""}`} onClick={() => resetTimer("long_break")}>
             Long break
           </button>
         </div>
 
         <div className="pomodoro-timer-card">
-          <p className="pomodoro-timer-display">{formatTimer(secondsRemaining)}</p>
+          <p className={`pomodoro-timer-display pomodoro-timer-display-${phase}`}>{formatTimer(secondsRemaining)}</p>
           <p className="pomodoro-timer-copy">{getPhasePrompt(phase)}</p>
         </div>
 
         <div className="pomodoro-actions-row">
           <button
             type="button"
-            className="primary-button pomodoro-action-button"
+            className={`primary-button pomodoro-action-button pomodoro-action-button-${phase}`}
             onClick={() => {
               setIsTimerRunning((currentIsTimerRunning) => !currentIsTimerRunning);
               setStatusMessage(null);

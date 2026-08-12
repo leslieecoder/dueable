@@ -14,6 +14,7 @@ interface ImportSemesterAssignmentRequest {
   availableUntil?: string;
   pointsPossible?: number;
   htmlUrl?: string;
+  submitted?: boolean;
 }
 
 interface ImportSemesterRequest {
@@ -21,6 +22,12 @@ interface ImportSemesterRequest {
   coursesImported?: number;
   assignmentsImported?: number;
   assignments?: ImportSemesterAssignmentRequest[];
+}
+
+interface ImportSkipSummary {
+  missingDueDate: number;
+  submitted: number;
+  invalid: number;
 }
 
 function buildCorsHeaders(request: NextRequest) {
@@ -216,9 +223,17 @@ export async function POST(request: NextRequest) {
       available_until: string | null;
       points_possible: number | null;
     }>();
+    const submittedAssignmentIdsByCourse = new Map<string, Set<string>>();
+    const importedAssignmentIdsByCourse = new Map<string, Set<string>>();
+    const skipped: ImportSkipSummary = {
+      missingDueDate: 0,
+      submitted: 0,
+      invalid: 0,
+    };
 
     for (const assignment of body.assignments) {
       if (typeof assignment?.id !== "number" || typeof assignment.courseId !== "number") {
+        skipped.invalid += 1;
         continue;
       }
 
@@ -231,11 +246,26 @@ export async function POST(request: NextRequest) {
       const availableUntil = parseCanvasAvailableUntil(assignment.availableUntil);
       const course = persistedCourseMap.get(`${canvasBaseUrl}:${String(assignment.courseId)}`);
 
-      if (!title || !dueDate || !course) {
+      if (!title || !course) {
+        skipped.invalid += 1;
+        continue;
+      }
+
+      if (!dueDate) {
+        skipped.missingDueDate += 1;
         continue;
       }
 
       const canvasAssignmentId = String(assignment.id);
+
+      if (assignment.submitted) {
+        skipped.submitted += 1;
+        const existingSubmittedIds = submittedAssignmentIdsByCourse.get(course.id) ?? new Set<string>();
+        existingSubmittedIds.add(canvasAssignmentId);
+        submittedAssignmentIdsByCourse.set(course.id, existingSubmittedIds);
+        continue;
+      }
+
       const dedupeKey = `${course.id}:${canvasAssignmentId}`;
 
       assignmentMap.set(dedupeKey, {
@@ -247,6 +277,10 @@ export async function POST(request: NextRequest) {
         available_until: availableUntil,
         points_possible: Number.isFinite(assignment.pointsPossible) ? assignment.pointsPossible ?? null : null,
       });
+
+      const importedIds = importedAssignmentIdsByCourse.get(course.id) ?? new Set<string>();
+      importedIds.add(canvasAssignmentId);
+      importedAssignmentIdsByCourse.set(course.id, importedIds);
     }
 
     const assignmentsToUpsert = Array.from(assignmentMap.values());
@@ -261,11 +295,50 @@ export async function POST(request: NextRequest) {
       throw new Error(assignmentsResult.error.message ?? "Unable to save Canvas assignments.");
     }
 
+    for (const [courseId, importedAssignmentIds] of importedAssignmentIdsByCourse.entries()) {
+      const ids = Array.from(importedAssignmentIds);
+
+      if (ids.length === 0) {
+        continue;
+      }
+
+      const reactivationResult = await supabase
+        .from("assignments")
+        .update({ status: "not_started" })
+        .eq("course_id", courseId)
+        .eq("status", "completed")
+        .in("canvas_assignment_id", ids);
+
+      if (reactivationResult.error) {
+        throw new Error(reactivationResult.error.message ?? "Unable to reactivate imported Canvas assignments.");
+      }
+    }
+
+    for (const [courseId, submittedAssignmentIds] of submittedAssignmentIdsByCourse.entries()) {
+      const ids = Array.from(submittedAssignmentIds);
+
+      if (ids.length === 0) {
+        continue;
+      }
+
+      const completionResult = await supabase
+        .from("assignments")
+        .update({ status: "completed" })
+        .eq("course_id", courseId)
+        .in("canvas_assignment_id", ids);
+
+      if (completionResult.error) {
+        throw new Error(completionResult.error.message ?? "Unable to hide submitted Canvas assignments.");
+      }
+    }
+
     return jsonWithCors(
       {
         success: true,
         coursesImported: coursesToUpsert.length,
         assignmentsImported: assignmentsToUpsert.length,
+        skipped,
+        canvasAssignmentsFound: body.assignments.length,
         assignmentIds: (assignmentsResult.data ?? []).map((assignment) => assignment.id),
       },
       { status: 200 },

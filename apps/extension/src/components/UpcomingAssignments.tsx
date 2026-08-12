@@ -171,6 +171,7 @@ export function UpcomingAssignments({
   const [timerSummaryByAssignment, setTimerSummaryByAssignment] = useState<
     Record<string, { completedFocusBlocks: number; targetFocusBlocks: number }>
   >({});
+  const [openExplainerAssignmentId, setOpenExplainerAssignmentId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -243,6 +244,7 @@ export function UpcomingAssignments({
           const queueBadge = getQueueBadge(assignment);
           const cardThemeClass = getCardThemeClass(assignment, priorityNumber);
           const priorityReasons = getPriorityReasons(assignment);
+          const isExplainerOpen = openExplainerAssignmentId === assignment.id;
 
           return (
             <article
@@ -316,19 +318,34 @@ export function UpcomingAssignments({
 
               {isExpanded ? (
                 <div className="priority-expanded-content">
-                  <div className="priority-explainer-card">
-                    <div className="priority-explainer-header">
-                      <span className="priority-explainer-label">
-                        <CircleHelp size={15} strokeWidth={2.2} />
-                        <span>{priorityNumber === 1 ? "Why this first?" : "Why this here?"}</span>
-                      </span>
-                      <span className="priority-explainer-pill">Chosen for urgency, impact, and effort</span>
-                    </div>
-                    <div className="priority-explainer-reasons">
-                      {priorityReasons.map((reason) => (
-                        <p key={reason}>{reason}</p>
-                      ))}
-                    </div>
+                  <div className="priority-explainer-shell">
+                    <button
+                      type="button"
+                      className={`priority-explainer-trigger${isExplainerOpen ? " priority-explainer-trigger-open" : ""}`}
+                      aria-expanded={isExplainerOpen}
+                      aria-label={priorityNumber === 1 ? "Explain why this is first" : "Explain why this assignment is placed here"}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setOpenExplainerAssignmentId((currentAssignmentId) => (currentAssignmentId === assignment.id ? null : assignment.id));
+                      }}
+                    >
+                      <CircleHelp size={16} strokeWidth={2.2} />
+                    </button>
+                    {isExplainerOpen ? (
+                      <div className="priority-explainer-card">
+                        <div className="priority-explainer-header">
+                          <span className="priority-explainer-label">
+                            {priorityNumber === 1 ? "Why this first?" : "Why this here?"}
+                          </span>
+                          <span className="priority-explainer-pill">Urgency, impact, and effort</span>
+                        </div>
+                        <div className="priority-explainer-reasons">
+                          {priorityReasons.map((reason) => (
+                            <p key={reason}>{reason}</p>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                   {renderExpandedContent(assignment, priorityNumber)}
                 </div>
