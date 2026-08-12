@@ -1,5 +1,5 @@
 import { AuthForm } from "@/features/auth/auth-form";
-import { loginAction } from "@/features/auth/actions";
+import { loginAction, signInWithGoogleAction } from "@/features/auth/actions";
 import { initialAuthActionState } from "@/features/auth/auth-state";
 
 export default async function LoginPage({
@@ -21,6 +21,8 @@ export default async function LoginPage({
         footerLinkLabel="Sign up"
         footerHref="/signup"
         action={loginAction}
+        oauthGoogleAction={signInWithGoogleAction}
+        oauthGoogleLabel="Continue with Google"
         initialState={initialAuthActionState}
         fields={[
           { name: "next", label: "Next", type: "hidden", defaultValue: next ?? "/extension" },

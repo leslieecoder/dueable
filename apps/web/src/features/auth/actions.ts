@@ -14,6 +14,10 @@ function normalizeAuthErrorMessage(message: string | undefined, mode: "login" | 
 
   const lowered = message.toLowerCase();
 
+  if (mode === "signup" && (lowered.includes("signups not allowed") || lowered.includes("signup is disabled") || lowered.includes("user signups are disabled"))) {
+    return "Email signups are disabled in Supabase for this project. Enable the Email provider and user signups in Supabase Auth.";
+  }
+
   if (lowered.includes("invalid login") || lowered.includes("invalid credentials")) {
     return "That email or password did not match your Dueable account.";
   }
@@ -35,6 +39,24 @@ function normalizeAuthErrorMessage(message: string | undefined, mode: "login" | 
   return mode === "login"
     ? "We couldn't sign you in right now. Try again in a moment."
     : "We couldn't create your account right now. Try again in a moment.";
+}
+
+function normalizePasswordResetErrorMessage(message: string | undefined) {
+  if (!message) {
+    return "We couldn't send a reset link right now. Try again in a moment.";
+  }
+
+  const lowered = message.toLowerCase();
+
+  if (lowered.includes("redirect") || lowered.includes("site url") || lowered.includes("email redirect")) {
+    return "Password reset is not configured correctly in Supabase. Add your app URL and /auth/callback redirect URL in Supabase Auth settings.";
+  }
+
+  if (lowered.includes("email provider") || lowered.includes("smtp") || lowered.includes("rate limit")) {
+    return "Supabase could not send the reset email. Check the email provider and auth rate-limit settings in Supabase.";
+  }
+
+  return "We couldn't send a reset link right now. Try again in a moment.";
 }
 
 function readField(formData: FormData, name: string) {
@@ -238,7 +260,7 @@ export async function forgotPasswordAction(
   if (error) {
     return {
       status: "error",
-      message: "We couldn't send a reset link right now. Try again in a moment.",
+      message: normalizePasswordResetErrorMessage(error.message),
     };
   }
 
