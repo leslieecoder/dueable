@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get("code");
   const tokenHash = requestUrl.searchParams.get("token_hash");
   const otpType = requestUrl.searchParams.get("type");
-  const next = requestUrl.searchParams.get("next") || "/extension";
+  const next = requestUrl.searchParams.get("next") || "/dashboard";
   const supabase = await createSupabaseServerClient();
 
   if (code) {
@@ -19,6 +19,6 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const redirectUrl = new URL(next.startsWith("/") ? next : "/extension", request.url);
+  const redirectUrl = new URL(next.startsWith("/") ? next : "/dashboard", request.url);
   return NextResponse.redirect(redirectUrl);
 }

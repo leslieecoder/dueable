@@ -127,7 +127,7 @@ export async function loginAction(
 ): Promise<AuthActionState> {
   const email = readField(formData, "email");
   const password = readField(formData, "password");
-  const next = readField(formData, "next") || "/extension";
+  const next = readField(formData, "next") || "/dashboard";
   const normalizedEmail = email.toLowerCase();
 
   if (!email || !password) {
@@ -173,7 +173,7 @@ export async function loginAction(
     data.user.id,
   );
 
-  redirect(next.startsWith("/") ? next : "/extension");
+  redirect(next.startsWith("/") ? next : "/dashboard");
 }
 
 export async function signupAction(
@@ -236,7 +236,7 @@ export async function signupAction(
     };
   }
 
-  redirect("/extension");
+  redirect("/dashboard");
 }
 
 export async function forgotPasswordAction(
@@ -277,10 +277,10 @@ export async function signOutAction() {
 }
 
 export async function signInWithGoogleAction(formData: FormData) {
-  const next = readField(formData, "next") || "/extension";
+  const next = readField(formData, "next") || "/dashboard";
   const supabase = await createSupabaseServerClient();
   const origin = await getAppOrigin();
-  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next.startsWith("/") ? next : "/extension")}`;
+  const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent(next.startsWith("/") ? next : "/dashboard")}`;
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",

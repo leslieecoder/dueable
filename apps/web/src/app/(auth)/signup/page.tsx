@@ -23,7 +23,7 @@ export default async function SignUpPage({
         oauthGoogleLabel="Continue with Google"
         initialState={initialAuthActionState}
         fields={[
-          { name: "next", label: "Next", type: "hidden", defaultValue: next ?? "/extension" },
+          { name: "next", label: "Next", type: "hidden", defaultValue: next ?? "/dashboard" },
           { name: "name", label: "Name", type: "text", placeholder: "Leslie Cruz" },
           { name: "email", label: "Email", type: "email", placeholder: "you@example.com" },
           { name: "password", label: "Password", type: "password", placeholder: "Create a strong password" },

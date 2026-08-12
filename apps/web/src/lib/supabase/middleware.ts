@@ -46,7 +46,7 @@ export async function updateSession(request: NextRequest) {
 
   if (user && isAuthRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = next?.startsWith("/") ? next : "/extension";
+    url.pathname = next?.startsWith("/") ? next : "/dashboard";
     url.search = "";
     return NextResponse.redirect(url);
   }

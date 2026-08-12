@@ -25,7 +25,7 @@ export default async function LoginPage({
         oauthGoogleLabel="Continue with Google"
         initialState={initialAuthActionState}
         fields={[
-          { name: "next", label: "Next", type: "hidden", defaultValue: next ?? "/extension" },
+          { name: "next", label: "Next", type: "hidden", defaultValue: next ?? "/dashboard" },
           { name: "email", label: "Email", type: "email", placeholder: "you@example.com" },
           { name: "password", label: "Password", type: "password", placeholder: "Enter your password" },
         ]}
