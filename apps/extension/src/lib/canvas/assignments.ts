@@ -9,6 +9,7 @@ export interface CanvasAssignment {
   availableUntil?: string;
   pointsPossible?: number;
   htmlUrl?: string;
+  submitted: boolean;
 }
 
 interface CanvasAssignmentApiResponse {
@@ -20,6 +21,15 @@ interface CanvasAssignmentApiResponse {
   lock_at?: unknown;
   points_possible?: unknown;
   html_url?: unknown;
+  submission?: unknown;
+}
+
+interface CanvasSubmissionApiResponse {
+  workflow_state?: unknown;
+  submitted_at?: unknown;
+  graded_at?: unknown;
+  score?: unknown;
+  grade?: unknown;
 }
 
 function getNextPageUrl(linkHeader: string | null) {
@@ -46,6 +56,16 @@ function normalizeAssignment(rawAssignment: CanvasAssignmentApiResponse, courseI
   }
 
   const normalizedCourseId = typeof rawAssignment.course_id === "number" ? rawAssignment.course_id : courseId;
+  const submission = rawAssignment.submission as CanvasSubmissionApiResponse | null | undefined;
+  const submissionWorkflowState = typeof submission?.workflow_state === "string" ? submission.workflow_state.toLowerCase() : null;
+  const hasSubmittedAt = typeof submission?.submitted_at === "string";
+  const hasCurrentUserSubmission = submission !== null && typeof submission === "object";
+  const isSubmitted =
+    hasCurrentUserSubmission &&
+    (hasSubmittedAt ||
+      submissionWorkflowState === "submitted" ||
+      submissionWorkflowState === "pending_review" ||
+      submissionWorkflowState === "complete");
 
   return {
     id: rawAssignment.id,
@@ -56,6 +76,7 @@ function normalizeAssignment(rawAssignment: CanvasAssignmentApiResponse, courseI
     availableUntil: typeof rawAssignment.lock_at === "string" ? rawAssignment.lock_at : undefined,
     pointsPossible: typeof rawAssignment.points_possible === "number" ? rawAssignment.points_possible : undefined,
     htmlUrl: typeof rawAssignment.html_url === "string" ? rawAssignment.html_url : undefined,
+    submitted: isSubmitted,
   };
 }
 
@@ -89,7 +110,7 @@ export async function getCanvasAssignments(tabId: number, canvasBaseUrl: string,
   console.log("[Dueable][Canvas API] Fetching assignments for course:", courseId);
 
   const assignments: CanvasAssignment[] = [];
-  let nextPageUrl: string | null = `${canvasBaseUrl}/api/v1/courses/${courseId}/assignments?per_page=100`;
+  let nextPageUrl: string | null = `${canvasBaseUrl}/api/v1/courses/${courseId}/assignments?per_page=100&include[]=submission`;
 
   while (nextPageUrl) {
     const page = await fetchAssignmentsPage(tabId, nextPageUrl);

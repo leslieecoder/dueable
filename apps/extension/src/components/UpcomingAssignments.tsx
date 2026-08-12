@@ -1,4 +1,4 @@
-import { Clock3, NotebookText, PlayCircle } from "lucide-react";
+import { CircleHelp, Clock3, NotebookText, PlayCircle } from "lucide-react";
 import { useEffect, type ReactNode, useState } from "react";
 import type { FormattedUpcomingAssignment } from "./extension-types";
 import { splitCourseDisplayLabel } from "./course-display";
@@ -16,7 +16,7 @@ interface StoredTimerStateMap {
 function formatPriorityLabel(priorityLabel: string, priorityNumber: number) {
   const matchedNumber = priorityLabel.match(/\d+/)?.[0];
 
-  if (matchedNumber) {
+  if (matchedNumber && Number(matchedNumber) === priorityNumber) {
     return `Priority #${matchedNumber}`;
   }
 
@@ -36,6 +36,70 @@ function formatEstimatedDuration(hours: number) {
 
 function getSuggestedFocusBlocks(estimatedHours: number) {
   return Math.max(1, Math.ceil((estimatedHours * 60) / WORK_MINUTES));
+}
+
+function getImpactReason(pointsPossible: number | null) {
+  if (pointsPossible === null || !Number.isFinite(pointsPossible)) {
+    return "Counts toward your course progress";
+  }
+
+  if (pointsPossible >= 100) {
+    return `High impact at ${Number.isInteger(pointsPossible) ? pointsPossible : pointsPossible.toFixed(1)} points`;
+  }
+
+  if (pointsPossible >= 40) {
+    return `Solid course impact at ${Number.isInteger(pointsPossible) ? pointsPossible : pointsPossible.toFixed(1)} points`;
+  }
+
+  return `Worth finishing with ${Number.isInteger(pointsPossible) ? pointsPossible : pointsPossible.toFixed(1)} points on the line`;
+}
+
+function getEffortReason(estimatedHours: number) {
+  if (estimatedHours >= 6) {
+    return "Needs a deep work block";
+  }
+
+  if (estimatedHours >= 3) {
+    return "Needs focused time soon";
+  }
+
+  return "Can be finished in a lighter session";
+}
+
+function getTimingReason(assignment: FormattedUpcomingAssignment) {
+  if (assignment.badgeLabel === "Work Ahead") {
+    return "Best to start early before it becomes urgent";
+  }
+
+  if (assignment.dateLabel === "Available until") {
+    return "Already overdue, but still open in Canvas";
+  }
+
+  if (assignment.dateLabel === "Closed") {
+    return "Past due and closed, so it stays lower in the queue";
+  }
+
+  const dueTime = new Date(assignment.dueDate).getTime();
+  const now = Date.now();
+  const daysUntilDue = Math.ceil((dueTime - now) / (1000 * 60 * 60 * 24));
+
+  if (!Number.isNaN(daysUntilDue) && daysUntilDue <= 1) {
+    return "Due very soon, so urgency pushes it up";
+  }
+
+  if (!Number.isNaN(daysUntilDue) && daysUntilDue <= 3) {
+    return "Due in the next few days";
+  }
+
+  return "Scheduled for this week";
+}
+
+function getPriorityReasons(assignment: FormattedUpcomingAssignment) {
+  return [
+    getTimingReason(assignment),
+    getImpactReason(assignment.pointsPossible),
+    getEffortReason(assignment.estimatedHours),
+  ];
 }
 
 function getDuePillClassName(dateText: string) {
@@ -178,6 +242,7 @@ export function UpcomingAssignments({
           const isExpanded = expandedAssignmentId === assignment.id;
           const queueBadge = getQueueBadge(assignment);
           const cardThemeClass = getCardThemeClass(assignment, priorityNumber);
+          const priorityReasons = getPriorityReasons(assignment);
 
           return (
             <article
@@ -249,7 +314,25 @@ export function UpcomingAssignments({
                 <span>Start this assignment</span>
               </button>
 
-              {isExpanded ? <div className="priority-expanded-content">{renderExpandedContent(assignment, priorityNumber)}</div> : null}
+              {isExpanded ? (
+                <div className="priority-expanded-content">
+                  <div className="priority-explainer-card">
+                    <div className="priority-explainer-header">
+                      <span className="priority-explainer-label">
+                        <CircleHelp size={15} strokeWidth={2.2} />
+                        <span>{priorityNumber === 1 ? "Why this first?" : "Why this here?"}</span>
+                      </span>
+                      <span className="priority-explainer-pill">Chosen for urgency, impact, and effort</span>
+                    </div>
+                    <div className="priority-explainer-reasons">
+                      {priorityReasons.map((reason) => (
+                        <p key={reason}>{reason}</p>
+                      ))}
+                    </div>
+                  </div>
+                  {renderExpandedContent(assignment, priorityNumber)}
+                </div>
+              ) : null}
             </article>
           );
         })}

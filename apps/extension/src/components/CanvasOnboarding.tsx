@@ -9,19 +9,25 @@ export function CanvasOnboarding({
   importStage,
   importSummary,
   importProgress,
+  showImportOnboarding,
   isImporting,
+  isResetting,
   feedbackMessage,
   onImport,
   onContinue,
+  onReset,
 }: {
   courseCount: number;
   importStage: "idle" | "syncing" | "done";
   importSummary: { coursesImported: number; assignmentsImported: number } | null;
   importProgress: ImportProgressState | null;
+  showImportOnboarding: boolean;
   isImporting: boolean;
+  isResetting: boolean;
   feedbackMessage: string | null;
   onImport: () => void;
   onContinue: () => void;
+  onReset: () => void;
 }) {
   if (importStage === "syncing") {
     return (
@@ -71,12 +77,36 @@ export function CanvasOnboarding({
             </article>
           </div>
 
-          <p className="panel-copy">Your assignments have been prioritized based on due date, points, difficulty, and workload.</p>
+          {showImportOnboarding ? (
+            <>
+              <p className="panel-copy onboarding-helper-copy">Dueable imported your active work and built your first ranked queue.</p>
+
+              <div className="onboarding-step-card sky">
+                <h3>Your semester, sorted</h3>
+                <p>We pull in your active Canvas assignments so you do not have to decide what to look at first.</p>
+              </div>
+
+              <div className="onboarding-step-card mint">
+                <h3>We rank what matters first</h3>
+                <p>Each assignment is prioritized by urgency, course impact, and how much focused work it still needs.</p>
+              </div>
+
+              <div className="onboarding-step-card peach">
+                <h3>Focus and finish</h3>
+                <p>Start a focus session on the top assignment and let Dueable keep the rest of the week in order.</p>
+              </div>
+            </>
+          ) : (
+            <p className="panel-copy">Your assignments have been prioritized based on due date, points, difficulty, and workload.</p>
+          )}
 
           {feedbackMessage ? <p className="panel-copy panel-feedback">{feedbackMessage}</p> : null}
 
           <button type="button" className="primary-button" onClick={onContinue}>
-            See what I should work on
+            {showImportOnboarding ? "See my ranked queue" : "See what I should work on"}
+          </button>
+          <button type="button" className="secondary-button" onClick={onReset} disabled={isResetting}>
+            {isResetting ? "Removing imports..." : "Remove imports and try again"}
           </button>
         </div>
       </section>
@@ -96,6 +126,9 @@ export function CanvasOnboarding({
 
         <button type="button" className="primary-button" onClick={onImport} disabled={isImporting}>
           {isImporting ? "Importing from Canvas" : "Import from Canvas"}
+        </button>
+        <button type="button" className="secondary-button" onClick={onReset} disabled={isResetting}>
+          {isResetting ? "Removing imports..." : "Remove old imports"}
         </button>
 
         {feedbackMessage ? <p className="panel-copy panel-feedback">{feedbackMessage}</p> : null}

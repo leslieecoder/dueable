@@ -912,6 +912,46 @@
   gap: 8px;
 }
 
+.course-filter-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.course-filter-row::-webkit-scrollbar {
+  display: none;
+}
+
+.course-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-height: 36px;
+  border-radius: 999px;
+  border: 1px solid #dfe7f4;
+  background: #f8fbff;
+  color: #66748b;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.course-filter-chip-active {
+  border-color: #b8cdf8;
+  background: linear-gradient(180deg, #eef4ff 0%, #e8f0ff 100%);
+  color: #2f64d8;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+}
+
 .queue-tab-button {
   display: grid;
   gap: 4px;
@@ -1479,7 +1519,64 @@
 }
 
 .priority-expanded-content {
+  display: grid;
+  gap: 12px;
   padding: 0 12px 12px;
+}
+
+.priority-explainer-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e5eefc;
+  border-radius: 18px;
+  padding: 14px;
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f6ff 100%);
+}
+
+.priority-explainer-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.priority-explainer-label,
+.priority-explainer-pill {
+  display: inline-flex;
+  align-items: center;
+}
+
+.priority-explainer-label {
+  gap: 7px;
+  color: #1f4fc0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.priority-explainer-pill {
+  border-radius: 999px;
+  background: rgba(51, 107, 219, 0.08);
+  color: #3665da;
+  padding: 7px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.priority-explainer-reasons {
+  display: grid;
+  gap: 8px;
+}
+
+.priority-explainer-reasons p {
+  margin: 0;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #475166;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .priority-detail-banner {
@@ -1621,6 +1718,21 @@
   height: 52px;
   background: transparent;
   color: #4c6fff;
+}
+
+.pomodoro-sound-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  justify-self: center;
+  min-height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #5f6f89;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .focus-complete-action {

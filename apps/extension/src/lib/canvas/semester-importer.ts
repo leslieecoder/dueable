@@ -12,6 +12,7 @@ export interface CanvasSemesterAssignment {
   availableUntil?: string;
   pointsPossible?: number;
   htmlUrl?: string;
+  submitted: boolean;
 }
 
 export interface CanvasSemesterImportResult {
@@ -85,6 +86,7 @@ export async function importSemester(
           availableUntil: assignment.availableUntil,
           pointsPossible: assignment.pointsPossible,
           htmlUrl: assignment.htmlUrl,
+          submitted: assignment.submitted,
         })),
       );
 

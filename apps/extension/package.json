@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "package:store": "VITE_DUEABLE_WEB_ORIGIN=https://dueable-web.vercel.app npm run build && rm -f dueable-extension-production.zip && cd dist && zip -r ../dueable-extension-production.zip .",
+    "package:store": "test -n \"$VITE_DUEABLE_WEB_ORIGIN\" && npm run build && rm -f dueable-extension-production.zip && cd dist && zip -r ../dueable-extension-production.zip .",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc -b"

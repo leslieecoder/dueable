@@ -9,6 +9,7 @@ import { importSemester, type CanvasSemesterImportProgress } from "./lib/canvas/
 import { ExtensionMessage } from "./lib/messages";
 import { AssignmentSteps } from "./components/AssignmentSteps";
 import { CanvasOnboarding } from "./components/CanvasOnboarding";
+import { splitCourseDisplayLabel } from "./components/course-display";
 import { UpcomingAssignments } from "./components/UpcomingAssignments";
 import type { ExtensionOverviewResponse } from "./components/extension-types";
 import "./App.css";
@@ -21,12 +22,26 @@ interface ImportSemesterResponse {
   success?: boolean;
   coursesImported?: number;
   assignmentsImported?: number;
+  canvasAssignmentsFound?: number;
+  skipped?: {
+    missingDueDate?: number;
+    submitted?: number;
+    invalid?: number;
+  };
   error?: string;
 }
 
 interface CompleteAssignmentResponse {
   success?: boolean;
   overview?: ExtensionOverviewResponse;
+  error?: string;
+}
+
+interface ClearImportsResponse {
+  success?: boolean;
+  deletedCourses?: number;
+  deletedAssignments?: number;
+  message?: string;
   error?: string;
 }
 
@@ -40,6 +55,7 @@ type PopupViewState = "loading" | "unauthenticated" | "needs-import" | "ready" |
 type ImportStage = "idle" | "syncing" | "done";
 type PlannerQueueView = "work_ahead" | "overdue" | null;
 type PlannerQueueTab = "this_week" | "work_ahead" | "overdue";
+type CourseFilterValue = "all" | string;
 
 interface CompletionState {
   assignmentTitle: string;
@@ -65,6 +81,11 @@ interface ImportProgressState {
   detail: string;
 }
 
+interface CourseFilterOption {
+  value: CourseFilterValue;
+  label: string;
+}
+
 function getWeeklyAssignmentIds(payload: ExtensionOverviewResponse) {
   if (!payload.focus) {
     return [] as string[];
@@ -86,6 +107,7 @@ function getQueueAssignmentIds(payload: ExtensionOverviewResponse, queue: Planne
 }
 
 const FIRST_LOGIN_REDIRECT_KEY = "dueableHasOpenedLoginFromPanel";
+const IMPORT_ONBOARDING_SEEN_KEY = "dueableHasSeenImportOnboarding";
 const ASSIGNMENT_COMPLETED_AUTO_ADVANCE_MS = 1400;
 
 function buildImportProgressState(progress: CanvasSemesterImportProgress): ImportProgressState {
@@ -162,6 +184,37 @@ function getFriendlyCanvasMessage(detail?: string) {
   }
 
   return detail ?? "We couldn't read your Canvas classes right now. Try refreshing Canvas and reopening the extension.";
+}
+
+function getZeroImportMessage(payload: ImportSemesterResponse) {
+  const submitted = payload.skipped?.submitted ?? 0;
+  const missingDueDate = payload.skipped?.missingDueDate ?? 0;
+  const invalid = payload.skipped?.invalid ?? 0;
+  const found = payload.canvasAssignmentsFound ?? 0;
+
+  if (found === 0) {
+    return "Dueable found the course, but Canvas did not return any assignments for it.";
+  }
+
+  if (submitted > 0 && missingDueDate === 0 && invalid === 0) {
+    return `Dueable found ${found} assignment${found === 1 ? "" : "s"}, but Canvas marked all of them as already submitted.`;
+  }
+
+  if (missingDueDate > 0 && submitted === 0 && invalid === 0) {
+    return `Dueable found ${found} assignment${found === 1 ? "" : "s"}, but all of them were missing due dates, so they were skipped.`;
+  }
+
+  if (submitted > 0 || missingDueDate > 0 || invalid > 0) {
+    const reasons = [
+      submitted > 0 ? `${submitted} marked submitted` : null,
+      missingDueDate > 0 ? `${missingDueDate} missing due dates` : null,
+      invalid > 0 ? `${invalid} missing required details` : null,
+    ].filter((value): value is string => value !== null);
+
+    return `Dueable found ${found} assignment${found === 1 ? "" : "s"}, but skipped them because ${reasons.join(", ")}.`;
+  }
+
+  return "Dueable found assignments in Canvas, but none were eligible to import.";
 }
 
 function getDefaultCanvasPrompt(): ErrorDisplayState {
@@ -283,14 +336,20 @@ function formatPoints(pointsPossible: number | null) {
   return `${Number.isInteger(pointsPossible) ? pointsPossible.toFixed(0) : pointsPossible.toFixed(1)} pts`;
 }
 
-function getWelcomeName(name: string | undefined) {
-  if (!name) {
-    return "Student";
+function getWeeklySummaryTitle(assignmentCount: number) {
+  if (assignmentCount <= 0) {
+    return "Nothing due this week";
   }
 
-  const trimmedName = name.trim();
+  return `${assignmentCount} assignment${assignmentCount === 1 ? "" : "s"} this week`;
+}
 
-  return trimmedName.length > 0 ? trimmedName : "Student";
+function getWeeklySummarySubtitle(assignmentCount: number) {
+  if (assignmentCount <= 0) {
+    return "You are clear for now.";
+  }
+
+  return "Start with the highest-impact one.";
 }
 
 function App() {
@@ -301,6 +360,7 @@ function App() {
   const [overview, setOverview] = useState<ExtensionOverviewResponse | null>(null);
   const [currentCanvasCourses, setCurrentCanvasCourses] = useState<CanvasCourse[]>([]);
   const [isImporting, setIsImporting] = useState(false);
+  const [isResettingImports, setIsResettingImports] = useState(false);
   const [isCompletingAssignment, setIsCompletingAssignment] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
@@ -308,7 +368,9 @@ function App() {
   const [importStage, setImportStage] = useState<ImportStage>("idle");
   const [importSummary, setImportSummary] = useState<{ coursesImported: number; assignmentsImported: number } | null>(null);
   const [importProgress, setImportProgress] = useState<ImportProgressState | null>(null);
+  const [showImportOnboarding, setShowImportOnboarding] = useState(false);
   const [errorDisplay, setErrorDisplay] = useState<ErrorDisplayState>(getDefaultCanvasPrompt);
+  const [selectedCourseFilter, setSelectedCourseFilter] = useState<CourseFilterValue>("all");
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
   const [expandedAssignmentId, setExpandedAssignmentId] = useState<string | null>(null);
   const [showClosedOverdueAssignments, setShowClosedOverdueAssignments] = useState(false);
@@ -359,7 +421,9 @@ function App() {
         setImportStage("idle");
         setImportSummary(null);
         setImportProgress(null);
+        setShowImportOnboarding(false);
         setErrorDisplay(getDefaultCanvasPrompt());
+        setSelectedCourseFilter("all");
         setExpandedAssignmentId(null);
         setRevealedQueue(null);
       }
@@ -379,6 +443,7 @@ function App() {
         setCurrentCanvasCourses([]);
         setSelectedAssignmentId(null);
         setExpandedAssignmentId(null);
+        setSelectedCourseFilter("all");
         setRevealedQueue(null);
         setViewState("unauthenticated");
 
@@ -502,6 +567,7 @@ function App() {
       setOverview(null);
       setCurrentCanvasCourses([]);
       setSelectedAssignmentId(null);
+      setSelectedCourseFilter("all");
       setRevealedQueue(null);
       setErrorDisplay(
         getLoadErrorDisplay(
@@ -631,7 +697,12 @@ function App() {
         coursesImported: payload.coursesImported ?? result.coursesImported,
         assignmentsImported: payload.assignmentsImported ?? result.assignmentsImported,
       });
-      setFeedbackMessage("Your assignments are ready. Pick one and start a focus block.");
+      setShowImportOnboarding((payload.assignmentsImported ?? result.assignmentsImported) > 0 && !(await getStoredFlag(IMPORT_ONBOARDING_SEEN_KEY)));
+      setFeedbackMessage(
+        (payload.assignmentsImported ?? result.assignmentsImported) > 0
+          ? "Your assignments are ready. Pick one and start a focus block."
+          : getZeroImportMessage(payload),
+      );
     } catch (error) {
       setImportStage("idle");
       setImportProgress(null);
@@ -681,6 +752,31 @@ function App() {
     }
   }
 
+  async function handleClearImports() {
+    setIsResettingImports(true);
+    setFeedbackMessage(null);
+
+    try {
+      const response = await fetch(getDueableUrl("/api/extension/clear-imports"), {
+        method: "POST",
+        credentials: "include",
+      });
+
+      const payload = (await response.json()) as ClearImportsResponse;
+
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error ?? "We couldn't clear your imported assignments right now.");
+      }
+
+      await loadExtensionState();
+      setFeedbackMessage(payload.message ?? "Your imported Canvas assignments were removed. You can import again now.");
+    } catch (error) {
+      setFeedbackMessage(error instanceof Error ? error.message : "We couldn't clear your imported assignments right now.");
+    } finally {
+      setIsResettingImports(false);
+    }
+  }
+
   async function handleLogout() {
     setIsLoggingOut(true);
     setFeedbackMessage(null);
@@ -701,6 +797,7 @@ function App() {
       setCurrentCanvasCourses([]);
       setSelectedAssignmentId(null);
       setExpandedAssignmentId(null);
+      setSelectedCourseFilter("all");
       setRevealedQueue(null);
       setViewState("unauthenticated");
       setFeedbackMessage("You have been logged out of Dueable.");
@@ -733,6 +830,11 @@ function App() {
   }, [completionState, viewState]);
 
   async function handleContinueAfterImport() {
+    if (showImportOnboarding) {
+      await setStoredFlag(IMPORT_ONBOARDING_SEEN_KEY, true);
+      setShowImportOnboarding(false);
+    }
+
     await loadExtensionState();
   }
 
@@ -745,6 +847,7 @@ function App() {
     setRevealedQueue("work_ahead");
     setSelectedAssignmentId(null);
     setExpandedAssignmentId(null);
+    setSelectedCourseFilter("all");
     setShowClosedOverdueAssignments(false);
   }
 
@@ -757,12 +860,14 @@ function App() {
     setRevealedQueue("overdue");
     setSelectedAssignmentId(null);
     setExpandedAssignmentId(null);
+    setSelectedCourseFilter("all");
     setShowClosedOverdueAssignments(false);
   }
 
   function handleSelectQueue(queue: PlannerQueueTab) {
     setSelectedAssignmentId(null);
     setExpandedAssignmentId(null);
+    setSelectedCourseFilter("all");
     setShowClosedOverdueAssignments(false);
 
     if (queue === "this_week") {
@@ -820,22 +925,61 @@ function App() {
     return [];
   }, [overview?.overdue, overview?.workAhead, revealedQueue, weeklyAssignments]);
 
+  const courseFilterOptions = useMemo<CourseFilterOption[]>(() => {
+    const options = new Map<string, CourseFilterOption>();
+
+    for (const assignment of visibleAssignments) {
+      const normalizedTitle = assignment.courseTitle.trim();
+
+      if (!normalizedTitle || options.has(normalizedTitle)) {
+        continue;
+      }
+
+      const courseDisplay = splitCourseDisplayLabel(normalizedTitle);
+
+      options.set(normalizedTitle, {
+        value: normalizedTitle,
+        label: courseDisplay.courseCode ?? courseDisplay.courseName,
+      });
+    }
+
+    return [{ value: "all", label: "All" }, ...Array.from(options.values()).sort((left, right) => left.label.localeCompare(right.label))];
+  }, [visibleAssignments]);
+
+  const filteredVisibleAssignments = useMemo(() => {
+    if (selectedCourseFilter === "all") {
+      return visibleAssignments;
+    }
+
+    return visibleAssignments.filter((assignment) => assignment.courseTitle.trim() === selectedCourseFilter);
+  }, [selectedCourseFilter, visibleAssignments]);
+
+  useEffect(() => {
+    if (selectedCourseFilter === "all") {
+      return;
+    }
+
+    if (!courseFilterOptions.some((option) => option.value === selectedCourseFilter)) {
+      setSelectedCourseFilter("all");
+    }
+  }, [courseFilterOptions, selectedCourseFilter]);
+
   const displayedAssignment = useMemo(() => {
-    if (visibleAssignments.length === 0) {
+    if (filteredVisibleAssignments.length === 0) {
       return null;
     }
 
-    return visibleAssignments.find((assignment) => assignment.id === selectedAssignmentId) ?? visibleAssignments[0];
-  }, [selectedAssignmentId, visibleAssignments]);
+    return filteredVisibleAssignments.find((assignment) => assignment.id === selectedAssignmentId) ?? filteredVisibleAssignments[0];
+  }, [filteredVisibleAssignments, selectedAssignmentId]);
   const hasWeeklyAssignments = weeklyAssignments.length > 0;
   const formattedVisibleAssignments = useMemo(
     () =>
-      visibleAssignments.map((assignment) => ({
+      filteredVisibleAssignments.map((assignment) => ({
         ...assignment,
         formattedDueText: `${assignment.dateLabel} ${formatDueDate(assignment.dueDate)}`,
         formattedPoints: formatPoints(assignment.pointsPossible),
       })),
-    [visibleAssignments],
+    [filteredVisibleAssignments],
   );
   const closedOverdueAssignments = useMemo<ClosedOverdueAssignmentSummary[]>(
     () =>
@@ -862,11 +1006,12 @@ function App() {
   const showQueueTabs =
     viewState === "ready" &&
     (availableQueueCounts.thisWeek > 0 || availableQueueCounts.overdue > 0 || availableQueueCounts.workAhead > 0);
-  const welcomeName = getWelcomeName(overview?.userName);
   const hasClosedOverdueAssignments = closedOverdueAssignments.length > 0;
   const showClosedOverdueToggle = viewState === "ready" && activeQueueTab === "overdue" && hasClosedOverdueAssignments;
   const showOverdueEmptyState = viewState === "ready" && activeQueueTab === "overdue" && !displayedAssignment;
   const showWorkAheadEmptyState = viewState === "ready" && activeQueueTab === "work_ahead" && !displayedAssignment;
+  const weeklySummaryTitle = getWeeklySummaryTitle(availableQueueCounts.thisWeek);
+  const weeklySummarySubtitle = getWeeklySummarySubtitle(availableQueueCounts.thisWeek);
 
   return (
     <main ref={popupShellRef} className="popup-shell">
@@ -914,10 +1059,13 @@ function App() {
           importStage={importStage}
           importSummary={importSummary}
           importProgress={importProgress}
+          showImportOnboarding={showImportOnboarding}
           isImporting={isImporting}
+          isResetting={isResettingImports}
           feedbackMessage={feedbackMessage}
           onImport={() => void handleImportAssignments()}
           onContinue={() => void handleContinueAfterImport()}
+          onReset={() => void handleClearImports()}
         />
       ) : null}
 
@@ -944,8 +1092,8 @@ function App() {
       {showQueueTabs ? (
         <section className="popup-panel popup-panel-compact">
           <div className="queue-tabs-header">
-            <p className="queue-tabs-title">Welcome {welcomeName}</p>
-            <p className="queue-tabs-subtitle">Let&apos;s get things done!</p>
+            <p className="queue-tabs-title">{weeklySummaryTitle}</p>
+            <p className="queue-tabs-subtitle">{weeklySummarySubtitle}</p>
           </div>
           <div className="queue-tabs" role="tablist" aria-label="Assignment queues">
             <button
@@ -984,6 +1132,26 @@ function App() {
                <span>Work Ahead</span>
             </button>
           </div>
+          {courseFilterOptions.length > 2 ? (
+            <div className="course-filter-row" role="tablist" aria-label="Class filters">
+              {courseFilterOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={selectedCourseFilter === option.value}
+                  className={`course-filter-chip${selectedCourseFilter === option.value ? " course-filter-chip-active" : ""}`}
+                  onClick={() => {
+                    setSelectedAssignmentId(null);
+                    setExpandedAssignmentId(null);
+                    setSelectedCourseFilter(option.value);
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -1064,8 +1232,8 @@ function App() {
               }}
             >
               {showClosedOverdueAssignments
-                ? `Hide ${closedOverdueAssignments.length} overdue assignment${closedOverdueAssignments.length === 1 ? "" : "s"} that are no longer available`
-                : `View ${closedOverdueAssignments.length} overdue assignment${closedOverdueAssignments.length === 1 ? "" : "s"} that are no longer available`}
+                ? `Hide ${closedOverdueAssignments.length} missed assignment${closedOverdueAssignments.length === 1 ? "" : "s"} that are locked now`
+                : `View ${closedOverdueAssignments.length} missed assignment${closedOverdueAssignments.length === 1 ? "" : "s"} that are locked now`}
             </button>
 
             {showClosedOverdueAssignments ? (
@@ -1091,6 +1259,9 @@ function App() {
 
       {viewState === "ready" && !showCaughtUpState ? (
         <div className="popup-footer-actions">
+          <button type="button" className="text-button" onClick={() => void handleClearImports()} disabled={isResettingImports}>
+            {isResettingImports ? "Removing imports..." : "Remove imported assignments"}
+          </button>
           <button type="button" className="text-button" onClick={() => void handleLogout()} disabled={isLoggingOut}>
             {isLoggingOut ? "Logging out..." : "Log out of Dueable"}
           </button>

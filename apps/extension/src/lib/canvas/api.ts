@@ -12,6 +12,13 @@ export interface CanvasEnrollment {
   role?: string;
 }
 
+export interface CanvasTerm {
+  id?: number;
+  name?: string;
+  start_at?: string;
+  end_at?: string;
+}
+
 export interface CanvasCourse {
   id: number;
   name: string;
@@ -22,6 +29,7 @@ export interface CanvasCourse {
   end_at?: string;
   access_restricted_by_date?: boolean;
   enrollments?: CanvasEnrollment[];
+  term?: CanvasTerm;
 }
 
 interface CanvasColorsResponse {
@@ -84,6 +92,21 @@ function normalizeEnrollments(value: unknown): CanvasEnrollment[] | undefined {
   return enrollments.length > 0 ? enrollments : undefined;
 }
 
+function normalizeTerm(value: unknown): CanvasTerm | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  const term = value as Record<string, unknown>;
+
+  return {
+    id: typeof term.id === "number" ? term.id : undefined,
+    name: typeof term.name === "string" ? term.name : undefined,
+    start_at: typeof term.start_at === "string" ? term.start_at : undefined,
+    end_at: typeof term.end_at === "string" ? term.end_at : undefined,
+  };
+}
+
 function normalizeCourse(candidate: Record<string, unknown>): CanvasCourse {
 
   return {
@@ -97,6 +120,7 @@ function normalizeCourse(candidate: Record<string, unknown>): CanvasCourse {
     access_restricted_by_date:
       typeof candidate.access_restricted_by_date === "boolean" ? candidate.access_restricted_by_date : undefined,
     enrollments: normalizeEnrollments(candidate.enrollments),
+    term: normalizeTerm(candidate.term),
   };
 }
 
@@ -216,7 +240,7 @@ export async function getCanvasCourses(tabId: number, canvasBaseUrl: string): Pr
   console.log("[Dueable][Canvas API] Starting course request.");
 
   const [{ bodyText }, courseColors] = await Promise.all([
-    requestCanvasApi(tabId, `${canvasBaseUrl}/api/v1/courses`, "Canvas courses request"),
+    requestCanvasApi(tabId, `${canvasBaseUrl}/api/v1/courses?enrollment_state=active&include[]=term`, "Canvas courses request"),
     getCanvasCourseColors(tabId, canvasBaseUrl).catch((error) => {
       console.warn("[Dueable][Canvas API] Unable to load course colors:", error);
       return new Map<number, string>();

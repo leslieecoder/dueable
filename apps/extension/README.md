@@ -4,9 +4,11 @@ This Chrome side-panel extension connects Canvas to the Dueable web app.
 
 ## Production Origin
 
-The extension defaults to the production Dueable web origin:
+Set the packaged extension origin explicitly before you build it:
 
-`https://dueable-web.vercel.app`
+```bash
+VITE_DUEABLE_WEB_ORIGIN=https://your-domain.com
+```
 
 That origin is used for:
 
@@ -36,11 +38,11 @@ npm run build --workspace @dueable/extension
 ## Chrome Web Store Packaging
 
 ```bash
-npm run package:store --workspace @dueable/extension
+VITE_DUEABLE_WEB_ORIGIN=https://your-domain.com npm run package:store --workspace @dueable/extension
 ```
 
 This creates `apps/extension/dueable-extension-production.zip`.
 
-`package:store` forces `VITE_DUEABLE_WEB_ORIGIN=https://dueable-web.vercel.app` so the packaged build does not inherit your local `.env.local` override.
+`package:store` now requires `VITE_DUEABLE_WEB_ORIGIN` so the packaged build and generated manifest both point at the same deployed domain.
 
 Before upload, keep `manifest.json` production-only. Do not add localhost host permissions to the store build.

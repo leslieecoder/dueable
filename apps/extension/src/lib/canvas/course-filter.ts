@@ -15,27 +15,49 @@ function parseDate(value: string | undefined) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function getEffectiveWindow(course: CanvasCourse) {
+  const termStartDate = parseDate(course.term?.start_at);
+  const termEndDate = parseDate(course.term?.end_at);
+
+  if (termStartDate || termEndDate) {
+    return {
+      startDate: termStartDate,
+      endDate: termEndDate,
+      source: "term" as const,
+    };
+  }
+
+  return {
+    startDate: parseDate(course.start_at),
+    endDate: parseDate(course.end_at),
+    source: "course" as const,
+  };
+}
+
+function isWithinEffectiveWindow(course: CanvasCourse, referenceDate: Date) {
+  const { startDate, endDate } = getEffectiveWindow(course);
+
+  if (!startDate && !endDate) {
+    return null;
+  }
+
+  if (startDate && endDate) {
+    return startDate.getTime() <= referenceDate.getTime() && referenceDate.getTime() <= endDate.getTime();
+  }
+
+  if (startDate) {
+    return startDate.getTime() <= referenceDate.getTime();
+  }
+
+  return referenceDate.getTime() <= (endDate?.getTime() ?? referenceDate.getTime());
+}
+
 function hasActiveEnrollment(course: CanvasCourse) {
   if (!course.enrollments || course.enrollments.length === 0) {
     return false;
   }
 
   return course.enrollments.some((enrollment) => enrollment.enrollment_state === "active");
-}
-
-function hasCourseDates(course: CanvasCourse) {
-  return Boolean(parseDate(course.start_at) || parseDate(course.end_at));
-}
-
-function isWithinCourseDates(course: CanvasCourse, referenceDate: Date) {
-  const startDate = parseDate(course.start_at);
-  const endDate = parseDate(course.end_at);
-
-  if (!startDate || !endDate) {
-    return false;
-  }
-
-  return startDate.getTime() <= referenceDate.getTime() && referenceDate.getTime() <= endDate.getTime();
 }
 
 function isCompletedCourse(course: CanvasCourse, referenceDate: Date) {
@@ -47,7 +69,7 @@ function isCompletedCourse(course: CanvasCourse, referenceDate: Date) {
     return true;
   }
 
-  const endDate = parseDate(course.end_at);
+  const { endDate } = getEffectiveWindow(course);
 
   if (!endDate) {
     return false;
@@ -65,11 +87,10 @@ export function filterCurrentSemesterCourses(courses: CanvasCourse[]): FilteredC
 
   for (const course of courses) {
     const activeEnrollment = hasActiveEnrollment(course);
-    const withinDates = isWithinCourseDates(course, now);
     const completed = isCompletedCourse(course, now);
-    const courseHasDates = hasCourseDates(course);
+    const withinWindow = isWithinEffectiveWindow(course, now);
 
-    if (!completed && activeEnrollment && (withinDates || !courseHasDates)) {
+    if (!completed && activeEnrollment && (withinWindow === null || withinWindow)) {
       currentCourses.push(course);
       continue;
     }

@@ -1,5 +1,5 @@
-import { Minus, Pause, Play, Plus, RotateCcw, StepForward } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Bell, BellOff, Minus, Pause, Play, Plus, RotateCcw, StepForward } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AssignmentCompleteButton } from "./AssignmentCompleteButton";
 import type { ExtensionOverviewFocus, ExtensionOverviewStep } from "./extension-types";
 
@@ -10,6 +10,7 @@ const SHORT_BREAK_MINUTES = 5;
 const LONG_BREAK_MINUTES = 15;
 const WORK_SESSIONS_UNTIL_LONG_BREAK = 4;
 const TIMER_STORAGE_KEY = "dueablePomodoroTimer";
+const TIMER_SOUND_ENABLED_KEY = "dueablePomodoroSoundEnabled";
 
 interface StoredTimerState {
   assignmentId: string;
@@ -22,6 +23,36 @@ interface StoredTimerState {
 }
 
 type StoredTimerStateMap = Record<string, StoredTimerState>;
+
+function playPomodoroDoneSound() {
+  const audioContext = new window.AudioContext();
+  const now = audioContext.currentTime;
+
+  const notes = [659.25, 783.99, 987.77];
+
+  notes.forEach((frequency, index) => {
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    const startAt = now + index * 0.12;
+    const endAt = startAt + 0.22;
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(frequency, startAt);
+
+    gainNode.gain.setValueAtTime(0.0001, startAt);
+    gainNode.gain.exponentialRampToValueAtTime(0.075, startAt + 0.03);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, endAt);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.start(startAt);
+    oscillator.stop(endAt);
+  });
+
+  window.setTimeout(() => {
+    void audioContext.close();
+  }, 700);
+}
 
 function getPhaseDurationSeconds(phase: TimerPhase) {
   if (phase === "work") {
@@ -158,10 +189,41 @@ export function AssignmentSteps({
   const [targetFocusBlocks, setTargetFocusBlocks] = useState(defaultTargetFocusBlocks);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [hasLoadedStoredState, setHasLoadedStoredState] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const hasLoadedSoundPreference = useRef(false);
   const completionPercent = useMemo(
     () => Math.min(100, Math.round((Math.min(completedFocusBlocks, targetFocusBlocks) / targetFocusBlocks) * 100)),
     [completedFocusBlocks, targetFocusBlocks],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      const stored = await chrome.storage.local.get(TIMER_SOUND_ENABLED_KEY);
+
+      if (cancelled) {
+        return;
+      }
+
+      setSoundEnabled(stored[TIMER_SOUND_ENABLED_KEY] !== false);
+      hasLoadedSoundPreference.current = true;
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedSoundPreference.current) {
+      return;
+    }
+
+    void chrome.storage.local.set({
+      [TIMER_SOUND_ENABLED_KEY]: soundEnabled,
+    });
+  }, [soundEnabled]);
 
   useEffect(() => {
     let cancelled = false;
@@ -247,6 +309,9 @@ export function AssignmentSteps({
 
         window.clearInterval(intervalId);
         setIsTimerRunning(false);
+        if (soundEnabled) {
+          playPomodoroDoneSound();
+        }
         setPhase((currentPhase) => {
           if (currentPhase === "work") {
             setCompletedFocusBlocks((currentCompletedFocusBlocks) => {
@@ -277,7 +342,7 @@ export function AssignmentSteps({
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [isTimerRunning]);
+  }, [isTimerRunning, soundEnabled]);
 
   function resetTimer(nextPhase: TimerPhase = "work") {
     setIsTimerRunning(false);
@@ -371,6 +436,16 @@ export function AssignmentSteps({
             <RotateCcw size={22} strokeWidth={2.1} />
           </button>
         </div>
+
+        <button
+          type="button"
+          className="pomodoro-sound-toggle"
+          onClick={() => setSoundEnabled((currentValue) => !currentValue)}
+          aria-pressed={soundEnabled}
+        >
+          {soundEnabled ? <Bell size={15} strokeWidth={2.2} /> : <BellOff size={15} strokeWidth={2.2} />}
+          <span>{soundEnabled ? "Sound on" : "Sound off"}</span>
+        </button>
 
         {onCompleteAssignment ? (
           <div className="focus-complete-action">
