@@ -108,6 +108,7 @@ function getQueueAssignmentIds(payload: ExtensionOverviewResponse, queue: Planne
 
 const FIRST_LOGIN_REDIRECT_KEY = "dueableHasOpenedLoginFromPanel";
 const ASSIGNMENT_COMPLETED_AUTO_ADVANCE_MS = 1400;
+const SHOW_IMPORT_RESET_CONTROLS = import.meta.env.DEV || import.meta.env.VITE_DUEABLE_ENABLE_IMPORT_RESET === "true";
 
 function buildImportProgressState(progress: CanvasSemesterImportProgress): ImportProgressState {
   switch (progress.stage) {
@@ -1125,11 +1126,11 @@ function App() {
           importSummary={importSummary}
           importProgress={importProgress}
           isImporting={isImporting}
-          isResetting={isResettingImports}
+          isResetting={SHOW_IMPORT_RESET_CONTROLS ? isResettingImports : false}
           feedbackMessage={feedbackMessage}
           onImport={() => void handleImportAssignments()}
           onContinue={() => void handleContinueAfterImport()}
-          onReset={() => void handleClearImports()}
+          onReset={SHOW_IMPORT_RESET_CONTROLS ? () => void handleClearImports() : undefined}
         />
       ) : null}
 
@@ -1342,9 +1343,11 @@ function App() {
 
       {viewState === "ready" && !showCaughtUpState ? (
         <div className="popup-footer-actions">
-          <button type="button" className="text-button" onClick={() => void handleClearImports()} disabled={isResettingImports}>
-            {isResettingImports ? "Removing imports..." : "Remove imported assignments"}
-          </button>
+          {SHOW_IMPORT_RESET_CONTROLS ? (
+            <button type="button" className="text-button" onClick={() => void handleClearImports()} disabled={isResettingImports}>
+              {isResettingImports ? "Removing imports..." : "Remove imported assignments"}
+            </button>
+          ) : null}
           <button type="button" className="text-button" onClick={() => void handleLogout()} disabled={isLoggingOut}>
             {isLoggingOut ? "Logging out..." : "Log out of Dueable"}
           </button>
