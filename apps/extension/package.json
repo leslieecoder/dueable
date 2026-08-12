@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "package:store": "test -n \"$VITE_DUEABLE_WEB_ORIGIN\" && npm run build && rm -f dueable-extension-production.zip && cd dist && zip -r ../dueable-extension-production.zip .",
+    "package:store": "test -n \"$VITE_DUEABLE_WEB_ORIGIN\" && npm run build && find dist -name '.DS_Store' -delete && rm -f dueable-extension-production.zip && cd dist && zip -r ../dueable-extension-production.zip . -x '*.DS_Store'",
     "lint": "eslint .",
     "preview": "vite preview",
     "typecheck": "tsc -b"
