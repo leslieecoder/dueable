@@ -15,18 +15,18 @@ interface IntroSlide {
 
 const INTRO_SLIDES: IntroSlide[] = [
   {
-    title: "Importa tu semestre",
-    description: "Conectamos con Canvas y traemos todos tus cursos y tareas activas en segundos.",
+    title: "Import your semester",
+    description: "Connect to Canvas and pull in your active courses and assignments in seconds.",
     icon: "import",
   },
   {
-    title: "Priorizamos lo que importa",
-    description: "Cada tarea se ordena por urgencia, peso en tu nota y esfuerzo pendiente. Sin adivinar.",
+    title: "Prioritize what matters",
+    description: "Each assignment is ranked by urgency, grade impact, and remaining effort. No guesswork.",
     icon: "priority",
   },
   {
-    title: "Enfocate y avanza",
-    description: "Inicia un bloque de enfoque en la tarea #1 y Dueable mantiene el resto de tu semana en orden.",
+    title: "Focus and keep moving",
+    description: "Start a focus block on your top assignment and let Dueable keep the rest of your week organized.",
     icon: "focus",
   },
 ];
@@ -106,24 +106,24 @@ export function CanvasOnboarding({
           <div className="state-mark state-mark-success" aria-hidden="true">
             <CircleCheckBig size={34} strokeWidth={2.4} />
           </div>
-          <h2 className="panel-title">Tu semestre esta listo</h2>
-          <p className="panel-copy onboarding-success-copy">Dueable importo tus cursos y tareas para que empieces con claridad.</p>
+          <h2 className="panel-title">Your semester is ready</h2>
+          <p className="panel-copy onboarding-success-copy">Dueable imported your courses and assignments so you can start with a clear plan.</p>
 
           <div className="semester-stats-grid">
             <article className="semester-stat-card">
               <strong>{importSummary?.coursesImported ?? courseCount}</strong>
-              <span>cursos</span>
+              <span>courses</span>
             </article>
             <article className="semester-stat-card">
               <strong>{importSummary?.assignmentsImported ?? 0}</strong>
-              <span>tareas</span>
+              <span>assignments</span>
             </article>
           </div>
 
           {feedbackMessage ? <p className="panel-copy panel-feedback">{feedbackMessage}</p> : null}
 
           <button type="button" className="primary-button" onClick={onContinue}>
-            Ver mi cola de prioridades
+            View my priority queue
           </button>
           {onReset ? (
             <button type="button" className="text-button onboarding-inline-text-button" onClick={onReset} disabled={isResetting}>
@@ -147,7 +147,7 @@ export function CanvasOnboarding({
           <p className="panel-copy">{activeSlide.description}</p>
         </div>
 
-        <div className="onboarding-dots" aria-label={`Paso ${activeSlideIndex + 1} de ${INTRO_SLIDES.length}`}>
+        <div className="onboarding-dots" aria-label={`Step ${activeSlideIndex + 1} of ${INTRO_SLIDES.length}`}>
           {INTRO_SLIDES.map((slide, index) => (
             <span
               key={slide.title}
@@ -162,10 +162,10 @@ export function CanvasOnboarding({
           onClick={isLastSlide ? onImport : () => setActiveSlideIndex((currentIndex) => Math.min(currentIndex + 1, INTRO_SLIDES.length - 1))}
           disabled={isImporting}
         >
-          {isImporting ? "Importando semestre" : isLastSlide ? "Importar semestre" : "Siguiente"}
+          {isImporting ? "Importing semester" : isLastSlide ? "Import semester" : "Next"}
         </button>
         <button type="button" className="text-button onboarding-inline-text-button" onClick={onContinue}>
-          Saltar intro
+          Skip intro
         </button>
         {onReset ? (
           <button type="button" className="secondary-button" onClick={onReset} disabled={isResetting}>
