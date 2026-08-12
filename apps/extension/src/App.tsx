@@ -317,10 +317,6 @@ async function detectCanvasTab(tabId: number, url: string) {
       target: { tabId },
       world: "MAIN",
       func: () => {
-        const locationHref = window.location.href.toLowerCase();
-        const title = document.title.toLowerCase();
-        const bodyText = document.body?.textContent?.slice(0, 2000).toLowerCase() ?? "";
-
         const hasCanvasShell = Boolean(
           document.querySelector("#application") ||
             document.querySelector("#dashboard") ||
@@ -331,10 +327,9 @@ async function detectCanvasTab(tabId: number, url: string) {
         );
 
         const hasCanvasGlobals = typeof (window as Window & { ENV?: unknown }).ENV !== "undefined";
-        const mentionsCanvas = locationHref.includes("canvas") || title.includes("canvas") || bodyText.includes("canvas");
 
         return {
-          isCanvas: hasCanvasShell || hasCanvasGlobals || mentionsCanvas,
+          isCanvas: hasCanvasShell || hasCanvasGlobals,
         } satisfies CanvasTabDetectionResult;
       },
     });

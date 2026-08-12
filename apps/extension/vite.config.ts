@@ -36,13 +36,17 @@ function resolveWebOrigin(mode: string, fileOrigin?: string) {
   return configuredOrigin;
 }
 
-function buildManifestPlugin(webOrigin: string): Plugin {
+function buildManifestPlugin(webOrigin: string, includeCanvasHosts: boolean): Plugin {
   return {
     name: "dueable-extension-manifest",
     apply: "build",
     generateBundle() {
       const normalizedOrigin = normalizeOrigin(webOrigin);
       const hostPermissions = [`${normalizedOrigin}/*`];
+
+      if (includeCanvasHosts) {
+        hostPermissions.push("*://*/courses/*", "*://*/assignments/*", "*://*.instructure.com/*");
+      }
 
       const manifest = {
         manifest_version: 3,
@@ -81,10 +85,14 @@ function buildManifestPlugin(webOrigin: string): Plugin {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, "");
   const webOrigin = resolveWebOrigin(mode, env.VITE_DUEABLE_WEB_ORIGIN || env.VITE_DUEABLE_DASHBOARD_URL);
+  const includeCanvasHosts = (process.env.VITE_DUEABLE_INCLUDE_CANVAS_HOSTS ?? env.VITE_DUEABLE_INCLUDE_CANVAS_HOSTS) === "true";
 
   return {
     base: "./",
-    plugins: [react(), buildManifestPlugin(webOrigin)],
+    define: {
+      __DUEABLE_WEB_ORIGIN__: JSON.stringify(webOrigin),
+    },
+    plugins: [react(), buildManifestPlugin(webOrigin, includeCanvasHosts)],
     build: {
       rollupOptions: {
         input: {

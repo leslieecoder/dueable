@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:local": "VITE_DUEABLE_WEB_ORIGIN=http://localhost:3000 VITE_DUEABLE_ALLOW_LOCALHOST_ORIGIN=true VITE_DUEABLE_INCLUDE_CANVAS_HOSTS=true npm run build",
     "package:store": "test -n \"$VITE_DUEABLE_WEB_ORIGIN\" && npm run build && find dist -name '.DS_Store' -delete && rm -f dueable-extension-production.zip && cd dist && zip -r ../dueable-extension-production.zip . -x '*.DS_Store'",
     "lint": "eslint .",
     "preview": "vite preview",

@@ -37,6 +37,14 @@ The root `manifest.json` keeps localhost host permissions so an unpacked local e
 npm run build --workspace @dueable/extension
 ```
 
+For local unpacked-extension testing against your local web app, use:
+
+```bash
+npm run build:local --workspace @dueable/extension
+```
+
+That keeps the extension pointed at `http://localhost:3000` for the built `dist` files you load in Chrome and restores Canvas host permissions needed for local testing on real Canvas tabs.
+
 ## Chrome Web Store Packaging
 
 ```bash

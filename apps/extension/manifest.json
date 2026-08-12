@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Dueable",
   "description": "Canvas focus coach for Dueable.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "action": {
     "default_title": "Dueable"
   },
@@ -16,7 +16,7 @@
   "side_panel": {
     "default_path": "dist/index.html"
   },
-  "host_permissions": ["http://localhost:3000/*", "https://localhost:3000/*", "https://dueable-web.vercel.app/*"],
+  "host_permissions": ["http://localhost:3000/*", "https://localhost:3000/*", "https://dueable-web.vercel.app/*", "*://*/courses/*", "*://*/assignments/*", "*://*.instructure.com/*"],
   "background": {
     "service_worker": "dist/background.js",
     "type": "module"
